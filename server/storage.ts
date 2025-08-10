@@ -372,16 +372,110 @@ export class PostgreSQLStorage implements IStorage {
     return result.rowCount > 0;
   }
 
-  async getAllVisits(): Promise<Visit[]> {
-    return await db.select().from(visits).orderBy(desc(visits.visitDate));
-  }
-
   async getVisitsByPatient(patientId: string): Promise<Visit[]> {
-    return await db.select().from(visits).where(eq(visits.patientId, patientId)).orderBy(desc(visits.visitDate));
+    return await db.select({
+      id: visits.id,
+      appointmentId: visits.appointmentId,
+      patientId: visits.patientId,
+      doctorId: visits.doctorId,
+      visitDate: visits.visitDate,
+      chiefComplaint: visits.chiefComplaint,
+      diagnosis: visits.diagnosis,
+      proceduresJson: visits.proceduresJson,
+      toothMapJson: visits.toothMapJson,
+      doctorNotes: visits.doctorNotes,
+      followUpDate: visits.followUpDate,
+      status: visits.status,
+      totalAmount: visits.totalAmount,
+      createdAt: visits.createdAt,
+      updatedAt: visits.updatedAt,
+      doctorName: users.fullName
+    })
+    .from(visits)
+    .leftJoin(users, eq(visits.doctorId, users.id))
+    .where(eq(visits.patientId, patientId))
+    .orderBy(desc(visits.visitDate));
   }
 
   async getVisitsByDoctor(doctorId: string): Promise<Visit[]> {
-    return await db.select().from(visits).where(eq(visits.doctorId, doctorId)).orderBy(desc(visits.visitDate));
+    return await db.select({
+      id: visits.id,
+      appointmentId: visits.appointmentId,
+      patientId: visits.patientId,
+      doctorId: visits.doctorId,
+      visitDate: visits.visitDate,
+      chiefComplaint: visits.chiefComplaint,
+      diagnosis: visits.diagnosis,
+      proceduresJson: visits.proceduresJson,
+      toothMapJson: visits.toothMapJson,
+      doctorNotes: visits.doctorNotes,
+      followUpDate: visits.followUpDate,
+      status: visits.status,
+      totalAmount: visits.totalAmount,
+      createdAt: visits.createdAt,
+      updatedAt: visits.updatedAt,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`
+    })
+    .from(visits)
+    .leftJoin(patients, eq(visits.patientId, patients.id))
+    .where(eq(visits.doctorId, doctorId))
+    .orderBy(desc(visits.visitDate));
+  }
+
+  async getVisitWithDetails(id: string): Promise<any | undefined> {
+    const result = await db.select({
+      id: visits.id,
+      appointmentId: visits.appointmentId,
+      patientId: visits.patientId,
+      doctorId: visits.doctorId,
+      visitDate: visits.visitDate,
+      chiefComplaint: visits.chiefComplaint,
+      diagnosis: visits.diagnosis,
+      proceduresJson: visits.proceduresJson,
+      toothMapJson: visits.toothMapJson,
+      doctorNotes: visits.doctorNotes,
+      followUpDate: visits.followUpDate,
+      status: visits.status,
+      totalAmount: visits.totalAmount,
+      createdAt: visits.createdAt,
+      updatedAt: visits.updatedAt,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      patientPhone: patients.phone,
+      patientCivilId: patients.civilId,
+      doctorName: users.fullName
+    })
+    .from(visits)
+    .leftJoin(patients, eq(visits.patientId, patients.id))
+    .leftJoin(users, eq(visits.doctorId, users.id))
+    .where(eq(visits.id, id))
+    .limit(1);
+    return result[0];
+  }
+
+  async getAllVisits(): Promise<Visit[]> {
+    return await db.select({
+      id: visits.id,
+      appointmentId: visits.appointmentId,
+      patientId: visits.patientId,
+      doctorId: visits.doctorId,
+      visitDate: visits.visitDate,
+      chiefComplaint: visits.chiefComplaint,
+      diagnosis: visits.diagnosis,
+      proceduresJson: visits.proceduresJson,
+      toothMapJson: visits.toothMapJson,
+      doctorNotes: visits.doctorNotes,
+      followUpDate: visits.followUpDate,
+      status: visits.status,
+      totalAmount: visits.totalAmount,
+      createdAt: visits.createdAt,
+      updatedAt: visits.updatedAt,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      doctorName: users.fullName
+    })
+    .from(visits)
+    .leftJoin(patients, eq(visits.patientId, patients.id))
+    .leftJoin(users, eq(visits.doctorId, users.id))
+    .orderBy(desc(visits.visitDate));
   }
 
   // Invoice management
@@ -421,6 +515,29 @@ export class PostgreSQLStorage implements IStorage {
 
   async getUnpaidInvoices(): Promise<Invoice[]> {
     return await db.select().from(invoices).where(sql`${invoices.totalAmount} > ${invoices.paidAmount}`).orderBy(desc(invoices.issueDate));
+  }
+
+  async getAppointmentWithDetails(id: string): Promise<any | undefined> {
+    const result = await db.select({
+      id: appointments.id,
+      patientId: appointments.patientId,
+      doctorId: appointments.doctorId,
+      serviceId: appointments.serviceId,
+      appointmentDate: appointments.appointmentDate,
+      duration: appointments.duration,
+      status: appointments.status,
+      notes: appointments.notes,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      doctorName: users.fullName,
+      serviceName: services.nameAr
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(appointments.patientId, patients.id))
+    .leftJoin(users, eq(appointments.doctorId, users.id))
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .where(eq(appointments.id, id))
+    .limit(1);
+    return result[0];
   }
 
   async getPendingInvoices(): Promise<Invoice[]> {

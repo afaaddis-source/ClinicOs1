@@ -15,7 +15,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, addDays, startOfWeek, addWeeks, subWeeks, isFriday, isToday } from "date-fns";
-import { CalendarIcon, Plus, Search, Clock, User, Phone, ChevronLeft, ChevronRight, Edit, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { CalendarIcon, Plus, Search, Clock, User, Phone, ChevronLeft, ChevronRight, Edit, CheckCircle, XCircle, AlertCircle, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -230,6 +230,25 @@ export default function AppointmentsPage() {
       toast({
         title: isArabic ? "خطأ" : "Error",
         description: error.message || (isArabic ? "فشل في إكمال الموعد" : "Failed to complete appointment"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const startVisitMutation = useMutation({
+    mutationFn: (appointmentId: string) => apiRequest(`/api/visits/start/${appointmentId}`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/visits'] });
+      toast({
+        title: isArabic ? "تم بدء الزيارة" : "Visit Started",
+        description: isArabic ? "تم بدء الزيارة الطبية بنجاح" : "Medical visit started successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: isArabic ? "خطأ" : "Error",
+        description: error.message || (isArabic ? "فشل في بدء الزيارة" : "Failed to start visit"),
         variant: "destructive",
       });
     },
@@ -525,6 +544,18 @@ export default function AppointmentsPage() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
+                      {apt.status !== "COMPLETED" && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => startVisitMutation.mutate(apt.id)}
+                          disabled={startVisitMutation.isPending}
+                          data-testid={`button-start-visit-${apt.id}`}
+                        >
+                          <Stethoscope className="w-4 h-4 mr-2" />
+                          {isArabic ? "بدء الزيارة" : "Start Visit"}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

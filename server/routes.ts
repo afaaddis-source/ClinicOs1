@@ -1075,6 +1075,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import and use visits routes
+  const visitRoutes = await import("./routes/visits.js");
+  app.use("/api/visits", visitRoutes.default);
+
   const httpServer = createServer(app);
   return httpServer;
 }

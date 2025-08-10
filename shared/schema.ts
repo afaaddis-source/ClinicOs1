@@ -94,11 +94,9 @@ export const visits = pgTable("visits", {
   visitDate: timestamp("visit_date").notNull().default(sql`CURRENT_TIMESTAMP`),
   chiefComplaint: text("chief_complaint"),
   diagnosis: text("diagnosis"),
-  treatment: text("treatment"),
-  prescriptions: jsonb("prescriptions"), // Array of medication objects
-  procedures: text("procedures").array(),
-  teethChart: jsonb("teeth_chart"), // Digital tooth mapping
-  notes: text("notes"),
+  proceduresJson: jsonb("procedures_json"), // Array of procedure objects with serviceId, tooth, surfaces, notes
+  toothMapJson: jsonb("tooth_map_json"), // Simple JSON of selected teeth
+  doctorNotes: text("doctor_notes"),
   followUpDate: timestamp("follow_up_date"),
   status: visitStatusEnum("status").notNull().default("IN_PROGRESS"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }),
@@ -381,5 +379,19 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 export type PatientFile = typeof patientFiles.$inferSelect;
 export type InsertPatientFile = z.infer<typeof insertPatientFileSchema>;
+
+// Visit-specific types
+export interface VisitProcedure {
+  serviceId: string;
+  tooth?: string; // tooth number (1-32)
+  surfaces?: string[]; // tooth surfaces like "mesial", "distal", "occlusal"
+  notes?: string;
+}
+
+export interface ToothData {
+  condition?: string; // "healthy", "decayed", "filled", "missing", "crowned"
+  treatment?: string; // treatment applied
+  notes?: string;
+}
 
 export type AuditLog = typeof auditLogs.$inferSelect;
