@@ -140,6 +140,10 @@ export interface IStorage {
 
   // Appointment queries
   getAppointmentsByDate(date: Date): Promise<any[]>;
+  getAvailableTimeSlots(date: Date, doctorId?: string, excludeAppointmentId?: string): Promise<string[]>;
+  checkAppointmentConflict(appointmentDate: Date, duration: number, doctorId: string, excludeAppointmentId?: string): Promise<boolean>;
+  getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<any[]>;
+  getWeeklyAppointments(startOfWeek: Date): Promise<any[]>;
 }
 
 export class PostgreSQLStorage implements IStorage {
@@ -536,6 +540,140 @@ export class PostgreSQLStorage implements IStorage {
       todayAppointments: todayAppointments[0].count,
       pendingPayments: Number(pendingPayments[0].sum)
     };
+  }
+
+  // Appointment slot management
+  async getAvailableTimeSlots(date: Date, doctorId?: string, excludeAppointmentId?: string): Promise<string[]> {
+    // Working hours: 09:00 - 21:00, slots every 30 minutes
+    const startHour = 9;
+    const endHour = 21;
+    const slotDuration = 30; // minutes
+
+    // Check if it's Friday (no appointments)
+    if (date.getDay() === 5) {
+      return [];
+    }
+
+    const slots: string[] = [];
+    
+    // Generate all possible slots
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += slotDuration) {
+        const timeSlot = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        slots.push(timeSlot);
+      }
+    }
+
+    // Get existing appointments for the date
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const whereConditions = [
+      sql`${appointments.appointmentDate} >= ${startOfDay}`,
+      sql`${appointments.appointmentDate} <= ${endOfDay}`,
+      sql`${appointments.status} != 'CANCELLED'`
+    ];
+
+    if (doctorId) {
+      whereConditions.push(eq(appointments.doctorId, doctorId));
+    }
+
+    if (excludeAppointmentId) {
+      whereConditions.push(sql`${appointments.id} != ${excludeAppointmentId}`);
+    }
+
+    const appointmentQuery = db.select().from(appointments)
+      .where(and(...whereConditions));
+
+    const existingAppointments = await appointmentQuery;
+
+    // Filter out occupied slots
+    const availableSlots = slots.filter(slot => {
+      const [hours, minutes] = slot.split(':').map(Number);
+      const slotTime = new Date(date);
+      slotTime.setHours(hours, minutes, 0, 0);
+
+      // Check if this slot conflicts with any existing appointment
+      return !existingAppointments.some(apt => {
+        const aptStart = new Date(apt.appointmentDate);
+        const aptEnd = new Date(aptStart.getTime() + apt.duration * 60000);
+        const slotEnd = new Date(slotTime.getTime() + slotDuration * 60000);
+
+        // Check for overlap
+        return (slotTime < aptEnd && slotEnd > aptStart);
+      });
+    });
+
+    return availableSlots;
+  }
+
+  async checkAppointmentConflict(appointmentDate: Date, duration: number, doctorId: string, excludeAppointmentId?: string): Promise<boolean> {
+    const aptStart = new Date(appointmentDate);
+    const aptEnd = new Date(aptStart.getTime() + duration * 60000);
+
+    const conflictConditions = [
+      eq(appointments.doctorId, doctorId),
+      sql`${appointments.status} != 'CANCELLED'`,
+      sql`${appointments.appointmentDate} < ${aptEnd}`,
+      sql`${appointments.appointmentDate} + INTERVAL '1 minute' * ${appointments.duration} > ${aptStart}`
+    ];
+
+    if (excludeAppointmentId) {
+      conflictConditions.push(sql`${appointments.id} != ${excludeAppointmentId}`);
+    }
+
+    const conflictQuery = db.select().from(appointments)
+      .where(and(...conflictConditions));
+
+    const conflicts = await conflictQuery;
+    return conflicts.length > 0;
+  }
+
+  async getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<any[]> {
+    return await db.select({
+      id: appointments.id,
+      appointmentDate: appointments.appointmentDate,
+      duration: appointments.duration,
+      status: appointments.status,
+      notes: appointments.notes,
+      patient: {
+        id: patients.id,
+        firstName: patients.firstName,
+        lastName: patients.lastName,
+        phone: patients.phone,
+        civilId: patients.civilId
+      },
+      doctor: {
+        id: users.id,
+        fullName: users.fullName,
+        username: users.username
+      },
+      service: {
+        id: services.id,
+        nameAr: services.nameAr,
+        nameEn: services.nameEn,
+        price: services.price
+      }
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(appointments.patientId, patients.id))
+    .leftJoin(users, eq(appointments.doctorId, users.id))
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .where(and(
+      sql`${appointments.appointmentDate} >= ${startDate}`,
+      sql`${appointments.appointmentDate} <= ${endDate}`
+    ))
+    .orderBy(appointments.appointmentDate);
+  }
+
+  async getWeeklyAppointments(startOfWeek: Date): Promise<any[]> {
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return await this.getAppointmentsByDateRange(startOfWeek, endOfWeek);
   }
 
 

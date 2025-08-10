@@ -602,12 +602,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get available time slots for a date
+  app.get("/api/appointments/available-slots", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { date, doctorId } = req.query;
+      
+      if (!date || typeof date !== "string") {
+        return res.status(400).json({ error: "Date is required" });
+      }
+
+      const appointmentDate = new Date(date);
+      const slots = await storage.getAvailableTimeSlots(
+        appointmentDate, 
+        doctorId as string | undefined
+      );
+      
+      res.json({ slots });
+    } catch (error) {
+      console.error("Get available slots error:", error);
+      res.status(500).json({ error: "Failed to fetch available time slots" });
+    }
+  });
+
+  // Get appointments by week for calendar view
+  app.get("/api/appointments/week", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { startDate } = req.query;
+      
+      if (!startDate || typeof startDate !== "string") {
+        return res.status(400).json({ error: "Start date is required" });
+      }
+
+      const appointments = await storage.getWeeklyAppointments(new Date(startDate));
+      res.json(appointments);
+    } catch (error) {
+      console.error("Get weekly appointments error:", error);
+      res.status(500).json({ error: "Failed to fetch weekly appointments" });
+    }
+  });
+
+  // Patient lookup by civil ID
+  app.get("/api/patients/lookup/:civilId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const patient = await storage.getPatientByCivilId(req.params.civilId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      res.json(patient);
+    } catch (error) {
+      console.error("Patient lookup error:", error);
+      res.status(500).json({ error: "Failed to lookup patient" });
+    }
+  });
+
   app.post("/api/appointments", requireAuth, async (req: Request, res: Response) => {
     try {
+      const userRole = req.session.user?.role;
+      
+      // Role-based permissions
+      if (!["ADMIN", "RECEPTION", "DOCTOR"].includes(userRole || "")) {
+        return res.status(403).json({ error: "Insufficient permissions to create appointments" });
+      }
+
       const appointmentData = insertAppointmentSchema.parse({
         ...req.body,
         createdBy: req.session.user?.id,
       });
+
+      // Check for appointment conflicts
+      const hasConflict = await storage.checkAppointmentConflict(
+        new Date(appointmentData.appointmentDate),
+        appointmentData.duration,
+        appointmentData.doctorId
+      );
+
+      if (hasConflict) {
+        return res.status(409).json({ 
+          error: req.acceptsLanguages('ar') 
+            ? "يوجد تضارب مع موعد آخر في نفس الوقت" 
+            : "Appointment conflicts with existing appointment" 
+        });
+      }
+
       const appointment = await storage.createAppointment(appointmentData);
       
       await storage.createAuditLog({
@@ -627,6 +703,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Create appointment error:", error);
       res.status(500).json({ error: "Failed to create appointment" });
+    }
+  });
+
+  // Update appointment (reschedule)
+  app.put("/api/appointments/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userRole = req.session.user?.role;
+      const appointmentId = req.params.id;
+      
+      // Check if appointment exists
+      const existingAppointment = await storage.getAppointment(appointmentId);
+      if (!existingAppointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Role-based permissions
+      if (userRole === "DOCTOR" && existingAppointment.doctorId !== req.session.user?.id) {
+        return res.status(403).json({ error: "Doctors can only update their own appointments" });
+      } else if (userRole === "ACCOUNTANT") {
+        return res.status(403).json({ error: "Accountants have read-only access" });
+      } else if (!["ADMIN", "RECEPTION", "DOCTOR"].includes(userRole || "")) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+
+      const appointmentData = insertAppointmentSchema.partial().parse(req.body);
+
+      // If rescheduing, check for conflicts
+      if (appointmentData.appointmentDate || appointmentData.duration || appointmentData.doctorId) {
+        const appointmentDate = appointmentData.appointmentDate ? 
+          new Date(appointmentData.appointmentDate) : 
+          new Date(existingAppointment.appointmentDate);
+        const duration = appointmentData.duration || existingAppointment.duration;
+        const doctorId = appointmentData.doctorId || existingAppointment.doctorId;
+
+        const hasConflict = await storage.checkAppointmentConflict(
+          appointmentDate,
+          duration,
+          doctorId,
+          appointmentId
+        );
+
+        if (hasConflict) {
+          return res.status(409).json({ 
+            error: req.acceptsLanguages('ar') 
+              ? "يوجد تضارب مع موعد آخر في نفس الوقت" 
+              : "Appointment conflicts with existing appointment" 
+          });
+        }
+      }
+
+      const updatedAppointment = await storage.updateAppointment(appointmentId, appointmentData);
+      
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "UPDATE",
+        tableName: "appointments",
+        recordId: appointmentId,
+        oldValues: existingAppointment,
+        newValues: appointmentData,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json(updatedAppointment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Update appointment error:", error);
+      res.status(500).json({ error: "Failed to update appointment" });
+    }
+  });
+
+  // Complete appointment (create skeleton visit)
+  app.post("/api/appointments/:id/complete", requireAuth, requireRole(["DOCTOR", "ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const appointmentId = req.params.id;
+      const appointment = await storage.getAppointment(appointmentId);
+      
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      if (appointment.status === "COMPLETED") {
+        return res.status(400).json({ error: "Appointment already completed" });
+      }
+
+      // Update appointment status
+      await storage.updateAppointment(appointmentId, { status: "COMPLETED" });
+
+      // Create skeleton visit
+      const visitData = {
+        appointmentId,
+        patientId: appointment.patientId,
+        doctorId: appointment.doctorId,
+        visitDate: new Date(),
+        status: "IN_PROGRESS" as const
+      };
+
+      const visit = await storage.createVisit(visitData);
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "COMPLETE_APPOINTMENT",
+        tableName: "appointments",
+        recordId: appointmentId,
+        newValues: { status: "COMPLETED", visitId: visit.id },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json({ 
+        message: "Appointment completed and visit created",
+        appointment: { ...appointment, status: "COMPLETED" },
+        visit 
+      });
+    } catch (error) {
+      console.error("Complete appointment error:", error);
+      res.status(500).json({ error: "Failed to complete appointment" });
+    }
+  });
+
+  // Update appointment status 
+  app.patch("/api/appointments/:id/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userRole = req.session.user?.role;
+      const appointmentId = req.params.id;
+      const { status, reason } = req.body;
+
+      if (!["SCHEDULED", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const appointment = await storage.getAppointment(appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Role-based permissions
+      if (userRole === "DOCTOR" && appointment.doctorId !== req.session.user?.id) {
+        return res.status(403).json({ error: "Doctors can only update their own appointments" });
+      } else if (userRole === "ACCOUNTANT") {
+        return res.status(403).json({ error: "Accountants have read-only access" });
+      }
+
+      const updateData: any = { status };
+      if (reason && (status === "CANCELLED" || status === "NO_SHOW")) {
+        updateData.notes = (appointment.notes || "") + `\n${status}: ${reason}`;
+      }
+
+      const updatedAppointment = await storage.updateAppointment(appointmentId, updateData);
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "STATUS_CHANGE",
+        tableName: "appointments", 
+        recordId: appointmentId,
+        oldValues: { status: appointment.status },
+        newValues: { status, reason },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json(updatedAppointment);
+    } catch (error) {
+      console.error("Update appointment status error:", error);
+      res.status(500).json({ error: "Failed to update appointment status" });
+    }
+  });
+
+  // Delete appointment
+  app.delete("/api/appointments/:id", requireAuth, requireRole(["ADMIN", "RECEPTION"]), async (req: Request, res: Response) => {
+    try {
+      const appointmentId = req.params.id;
+      const appointment = await storage.getAppointment(appointmentId);
+      
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      const deleted = await storage.deleteAppointment(appointmentId);
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete appointment" });
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "DELETE",
+        tableName: "appointments",
+        recordId: appointmentId,
+        oldValues: appointment,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json({ message: "Appointment deleted successfully" });
+    } catch (error) {
+      console.error("Delete appointment error:", error);
+      res.status(500).json({ error: "Failed to delete appointment" });
+    }
+  });
+
+  // Get doctors for appointment assignment
+  app.get("/api/doctors", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const doctors = await storage.getUsersByRole("DOCTOR");
+      const safeDoctors = doctors.map(doctor => ({
+        id: doctor.id,
+        fullName: doctor.fullName,
+        username: doctor.username,
+        isActive: doctor.isActive
+      }));
+      res.json(safeDoctors);
+    } catch (error) {
+      console.error("Get doctors error:", error);
+      res.status(500).json({ error: "Failed to fetch doctors" });
     }
   });
 
