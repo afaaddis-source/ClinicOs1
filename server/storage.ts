@@ -297,7 +297,7 @@ export class PostgreSQLStorage implements IStorage {
       status: appointments.status,
       patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
       doctorId: appointments.doctorId,
-      serviceName: services.serviceName,
+      serviceName: services.nameAr,
     })
     .from(appointments)
     .leftJoin(patients, eq(appointments.patientId, patients.id))
