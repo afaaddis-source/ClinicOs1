@@ -44,20 +44,22 @@ app.use(session({
   },
 }));
 
-// CSRF protection (skip for login endpoint)
-const csrfProtection = csrf({
-  cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  },
-});
-
-// Apply CSRF protection to all routes except login
+// CSRF protection - conditionally apply
 app.use((req, res, next) => {
-  if (req.path === "/api/auth/login" || req.method === "GET") {
+  // Skip CSRF for GET requests and login endpoint
+  if (req.method === "GET" || req.path === "/api/auth/login") {
     return next();
   }
+  
+  // Apply CSRF protection for other routes
+  const csrfProtection = csrf({
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    },
+  });
+  
   return csrfProtection(req, res, next);
 });
 

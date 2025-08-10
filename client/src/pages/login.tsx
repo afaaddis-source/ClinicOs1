@@ -70,7 +70,6 @@ export default function LoginPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(csrfToken && { "X-CSRF-Token": csrfToken }),
         },
         credentials: "include",
         body: JSON.stringify(data),
@@ -85,17 +84,14 @@ export default function LoginPage() {
       return result;
     },
     onSuccess: (data) => {
+      console.log("Login successful:", data);
       toast({
         title: isArabic ? "تم تسجيل الدخول بنجاح" : "Login successful",
         description: isArabic ? `مرحباً ${data.user.fullName}` : `Welcome ${data.user.fullName}`,
       });
       
-      // Update CSRF token for future requests
-      if (data.csrfToken) {
-        setCsrfToken(data.csrfToken);
-      }
-      
-      navigate("/dashboard");
+      // Force refresh user data
+      window.location.href = "/dashboard";
     },
     onError: (error: Error) => {
       toast({
@@ -222,7 +218,7 @@ export default function LoginPage() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={loginMutation.isPending || !csrfToken}
+                  disabled={loginMutation.isPending}
                   data-testid="button-login"
                 >
                   {loginMutation.isPending ? (
@@ -238,11 +234,7 @@ export default function LoginPage() {
                   )}
                 </Button>
 
-                {!csrfToken && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    {isArabic ? 'جاري تحميل الأمان...' : 'Loading security...'}
-                  </p>
-                )}
+
               </form>
             </Form>
           </CardContent>

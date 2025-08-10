@@ -285,18 +285,28 @@ export class PostgreSQLStorage implements IStorage {
     return await db.select().from(appointments).orderBy(desc(appointments.appointmentDate));
   }
 
-  async getAppointmentsByDate(date: Date): Promise<Appointment[]> {
+  async getAppointmentsByDate(date: Date): Promise<any[]> {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    return await db.select().from(appointments).where(
-      and(
-        sql`${appointments.appointmentDate} >= ${startOfDay}`,
-        sql`${appointments.appointmentDate} <= ${endOfDay}`
-      )
-    ).orderBy(appointments.appointmentDate);
+    return await db.select({
+      id: appointments.id,
+      appointmentDate: appointments.appointmentDate,
+      status: appointments.status,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      doctorId: appointments.doctorId,
+      serviceName: services.serviceName,
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(appointments.patientId, patients.id))
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .where(and(
+      sql`${appointments.appointmentDate} >= ${startOfDay}`,
+      sql`${appointments.appointmentDate} <= ${endOfDay}`
+    ))
+    .orderBy(appointments.appointmentDate);
   }
 
   async getAppointmentsByPatient(patientId: string): Promise<Appointment[]> {
@@ -499,29 +509,7 @@ export class PostgreSQLStorage implements IStorage {
     };
   }
 
-  async getAppointmentsByDate(date: Date): Promise<any[]> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
 
-    return await db.select({
-      id: appointments.id,
-      appointmentDate: appointments.appointmentDate,
-      status: appointments.status,
-      patientName: patients.fullName,
-      doctorId: appointments.doctorId,
-      serviceName: services.name,
-    })
-    .from(appointments)
-    .leftJoin(patients, eq(appointments.patientId, patients.id))
-    .leftJoin(services, eq(appointments.serviceId, services.id))
-    .where(and(
-      sql`${appointments.appointmentDate} >= ${startOfDay}`,
-      sql`${appointments.appointmentDate} <= ${endOfDay}`
-    ))
-    .orderBy(appointments.appointmentDate);
-  }
 }
 
 export const storage = new PostgreSQLStorage();
