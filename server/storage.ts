@@ -90,6 +90,7 @@ export interface IStorage {
   getAllInvoices(): Promise<Invoice[]>;
   getInvoicesByPatient(patientId: string): Promise<Invoice[]>;
   getUnpaidInvoices(): Promise<Invoice[]>;
+  getPendingInvoices(): Promise<Invoice[]>;
 
   // Invoice Items management
   getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]>;
@@ -127,6 +128,9 @@ export interface IStorage {
     todayAppointments: number;
     pendingPayments: number;
   }>;
+
+  // Appointment queries
+  getAppointmentsByDate(date: Date): Promise<any[]>;
 }
 
 export class PostgreSQLStorage implements IStorage {
@@ -376,6 +380,10 @@ export class PostgreSQLStorage implements IStorage {
     return await db.select().from(invoices).where(sql`${invoices.totalAmount} > ${invoices.paidAmount}`).orderBy(desc(invoices.issueDate));
   }
 
+  async getPendingInvoices(): Promise<Invoice[]> {
+    return await db.select().from(invoices).where(sql`${invoices.totalAmount} > ${invoices.paidAmount}`).orderBy(desc(invoices.issueDate));
+  }
+
   // Invoice Items management
   async getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
     return await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
@@ -489,6 +497,30 @@ export class PostgreSQLStorage implements IStorage {
       todayAppointments: todayAppointments[0].count,
       pendingPayments: Number(pendingPayments[0].sum)
     };
+  }
+
+  async getAppointmentsByDate(date: Date): Promise<any[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return await db.select({
+      id: appointments.id,
+      appointmentDate: appointments.appointmentDate,
+      status: appointments.status,
+      patientName: patients.fullName,
+      doctorId: appointments.doctorId,
+      serviceName: services.name,
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(appointments.patientId, patients.id))
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .where(and(
+      sql`${appointments.appointmentDate} >= ${startOfDay}`,
+      sql`${appointments.appointmentDate} <= ${endOfDay}`
+    ))
+    .orderBy(appointments.appointmentDate);
   }
 }
 

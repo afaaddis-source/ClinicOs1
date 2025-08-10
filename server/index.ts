@@ -1,12 +1,38 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import csrf from "csurf";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Session configuration
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Session configuration with PostgreSQL store
+const PgSession = connectPgSimple(session);
 app.use(session({
+  store: new PgSession({
+    conString: process.env.DATABASE_URL,
+    tableName: "session",
+    createTableIfMissing: true,
+  }),
   secret: process.env.SESSION_SECRET || "clinicos-development-secret-change-in-production",
   resave: false,
   saveUninitialized: false,
@@ -14,11 +40,26 @@ app.use(session({
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: "strict",
   },
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// CSRF protection (skip for login endpoint)
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  },
+});
+
+// Apply CSRF protection to all routes except login
+app.use((req, res, next) => {
+  if (req.path === "/api/auth/login" || req.method === "GET") {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

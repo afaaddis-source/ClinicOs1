@@ -2,15 +2,22 @@ import { useContext } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   Users, 
   Calendar, 
   DollarSign, 
   TrendingUp,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  Play,
+  Plus
 } from "lucide-react";
 import { LanguageContext } from "@/App";
+import { useUser } from "@/hooks/use-auth";
 
 interface DashboardStats {
   totalPatients: number;
@@ -23,6 +30,7 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { language } = useContext(LanguageContext);
+  const { user } = useUser();
   const isArabic = language === 'ar';
 
   const { data: stats, isLoading } = useQuery({
@@ -34,6 +42,30 @@ export default function DashboardPage() {
       if (!response.ok) throw new Error("Failed to fetch stats");
       return response.json();
     },
+  });
+
+  const { data: todayAppointments } = useQuery({
+    queryKey: ["/api/appointments/today"],
+    queryFn: async () => {
+      const response = await fetch("/api/appointments/today", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch today's appointments");
+      return response.json();
+    },
+    enabled: user?.role === 'DOCTOR' || user?.role === 'RECEPTION',
+  });
+
+  const { data: pendingInvoices } = useQuery({
+    queryKey: ["/api/invoices/pending"],
+    queryFn: async () => {
+      const response = await fetch("/api/invoices/pending", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch pending invoices");
+      return response.json();
+    },
+    enabled: user?.role === 'ACCOUNTANT',
   });
 
   const formatCurrency = (amount: number) => {
@@ -117,6 +149,193 @@ export default function DashboardPage() {
     );
   }
 
+  // Role-specific dashboard rendering
+  const renderAdminDashboard = () => (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {statsCards.map((stat, index) => {
+        const Icon = stat.icon;
+        return (
+          <Card key={index} data-testid={`card-stat-${index}`}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
+              <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                <Icon className={`h-4 w-4 ${stat.color}`} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid={`text-stat-value-${index}`}>
+                {stat.value}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+
+  const renderReceptionDashboard = () => (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>{isArabic ? 'مواعيد اليوم' : "Today's Schedule"}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {todayAppointments?.slice(0, 5).map((appointment: any, index: number) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="font-medium">{appointment.patientName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(appointment.appointmentDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  </p>
+                </div>
+                <Badge variant={appointment.status === 'CONFIRMED' ? 'default' : 'secondary'}>
+                  {appointment.status}
+                </Badge>
+              </div>
+            )) || (
+              <p className="text-muted-foreground text-center py-4">
+                {isArabic ? 'لا توجد مواعيد اليوم' : 'No appointments today'}
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>{isArabic ? 'البحث عن مريض' : 'Patient Search'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{isArabic ? 'رقم الهوية المدنية' : 'Civil ID'}</Label>
+              <div className="flex space-x-2">
+                <Input placeholder={isArabic ? 'أدخل رقم الهوية' : 'Enter Civil ID'} />
+                <Button size="icon">
+                  <Search className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderDoctorDashboard = () => (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>{isArabic ? 'مواعيدي اليوم' : 'My Appointments Today'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {todayAppointments?.filter((apt: any) => apt.doctorId === user?.id).map((appointment: any, index: number) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="font-medium">{appointment.patientName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(appointment.appointmentDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {appointment.serviceName}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline">
+                  <Play className="h-4 w-4 mr-2" />
+                  {isArabic ? 'بدء الزيارة' : 'Start Visit'}
+                </Button>
+              </div>
+            )) || (
+              <p className="text-muted-foreground text-center py-4">
+                {isArabic ? 'لا توجد مواعيد اليوم' : 'No appointments today'}
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>{isArabic ? 'الإحصائيات السريعة' : 'Quick Stats'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">
+                {isArabic ? 'مواعيد اليوم' : 'Today\'s Appointments'}
+              </span>
+              <Badge variant="secondary">{stats?.todayAppointments || 0}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">
+                {isArabic ? 'المرضى الجدد هذا الشهر' : 'New Patients This Month'}
+              </span>
+              <Badge variant="secondary">12</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const renderAccountantDashboard = () => (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>{isArabic ? 'فواتير اليوم' : "Today's Invoices"}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {pendingInvoices?.slice(0, 5).map((invoice: any, index: number) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="font-medium">{invoice.patientName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {isArabic ? 'فاتورة رقم' : 'Invoice'} #{invoice.invoiceNumber}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium">{formatCurrency(invoice.totalAmount)}</p>
+                  <Button size="sm" variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    {isArabic ? 'إضافة دفعة' : 'Add Payment'}
+                  </Button>
+                </div>
+              </div>
+            )) || (
+              <p className="text-muted-foreground text-center py-4">
+                {isArabic ? 'لا توجد فواتير معلقة' : 'No pending invoices'}
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>{isArabic ? 'الملخص المالي' : 'Financial Summary'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">
+                {isArabic ? 'إجمالي غير مدفوع' : 'Total Unpaid'}
+              </span>
+              <Badge variant="destructive">{formatCurrency(stats?.pendingPayments || 0)}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">
+                {isArabic ? 'إيرادات الشهر' : 'Monthly Revenue'}
+              </span>
+              <Badge variant="secondary">{formatCurrency(stats?.monthlyRevenue || 0)}</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   return (
     <div className="p-6" data-testid="dashboard-page">
       <div className="mb-6">
@@ -124,32 +343,18 @@ export default function DashboardPage() {
           {isArabic ? 'لوحة التحكم' : 'Dashboard'}
         </h1>
         <p className="text-muted-foreground">
-          {isArabic ? 'نظرة عامة على أداء العيادة' : 'Overview of clinic performance'}
+          {user?.role === 'ADMIN' ? (isArabic ? 'نظرة عامة على أداء العيادة' : 'Overview of clinic performance') :
+           user?.role === 'DOCTOR' ? (isArabic ? 'مواعيدك وإحصائياتك' : 'Your appointments and statistics') :
+           user?.role === 'RECEPTION' ? (isArabic ? 'جدول المواعيد والبحث عن المرضى' : 'Appointment schedule and patient search') :
+           user?.role === 'ACCOUNTANT' ? (isArabic ? 'الفواتير والمدفوعات' : 'Invoices and payments') :
+           (isArabic ? 'نظرة عامة' : 'Overview')}
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {statsCards.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={index} data-testid={`card-stat-${index}`}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {stat.title}
-                </CardTitle>
-                <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                  <Icon className={`h-4 w-4 ${stat.color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid={`text-stat-value-${index}`}>
-                  {stat.value}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {user?.role === 'ADMIN' && renderAdminDashboard()}
+      {user?.role === 'RECEPTION' && renderReceptionDashboard()}
+      {user?.role === 'DOCTOR' && renderDoctorDashboard()}
+      {user?.role === 'ACCOUNTANT' && renderAccountantDashboard()}
 
       <div className="mt-8 grid gap-6 md:grid-cols-2">
         <Card>

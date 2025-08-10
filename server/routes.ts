@@ -56,18 +56,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
+  // CSRF token endpoint
+  app.get("/api/csrf-token", (req: Request, res: Response) => {
+    res.json({ csrfToken: req.csrfToken ? req.csrfToken() : null });
+  });
+
   // Auth routes
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
       const { username, password } = req.body;
       
       if (!username || !password) {
-        return res.status(400).json({ error: "Username and password required" });
+        return res.status(400).json({ 
+          error: req.acceptsLanguages('ar') ? "اسم المستخدم وكلمة المرور مطلوبان" : "Username and password required" 
+        });
       }
 
       const user = await storage.authenticateUser(username, password);
       if (!user) {
-        return res.status(401).json({ error: "Invalid credentials" });
+        return res.status(401).json({ 
+          error: req.acceptsLanguages('ar') ? "اسم المستخدم أو كلمة المرور غير صحيحة" : "Invalid credentials" 
+        });
       }
 
       req.session.user = {
@@ -88,11 +97,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ 
         user: req.session.user,
-        message: "Login successful" 
+        message: req.acceptsLanguages('ar') ? "تم تسجيل الدخول بنجاح" : "Login successful",
+        csrfToken: req.csrfToken ? req.csrfToken() : null
       });
     } catch (error) {
       console.error("Login error:", error);
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ 
+        error: req.acceptsLanguages('ar') ? "خطأ في الخادم الداخلي" : "Internal server error" 
+      });
     }
   });
 
@@ -133,6 +145,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/appointments/today", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const today = new Date();
+      const appointments = await storage.getAppointmentsByDate(today);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Today appointments error:", error);
+      res.status(500).json({ error: "Failed to fetch today's appointments" });
+    }
+  });
+
+  app.get("/api/invoices/pending", requireAuth, requireRole(["ADMIN", "ACCOUNTANT"]), async (req: Request, res: Response) => {
+    try {
+      const invoices = await storage.getPendingInvoices();
+      res.json(invoices);
+    } catch (error) {
+      console.error("Pending invoices error:", error);
+      res.status(500).json({ error: "Failed to fetch pending invoices" });
+    }
+  });
+
   // User management routes
   app.get("/api/users", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
     try {
@@ -168,6 +201,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Create user error:", error);
       res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.put("/api/users/:id", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const userData = insertUserSchema.partial().parse(req.body);
+      const oldUser = await storage.getUser(req.params.id);
+      const user = await storage.updateUser(req.params.id, userData);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "UPDATE",
+        tableName: "users",
+        recordId: user.id,
+        oldValues: oldUser ? { ...oldUser, password: "[HIDDEN]" } : undefined,
+        newValues: { ...userData, password: userData.password ? "[HIDDEN]" : undefined },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json({ ...user, password: undefined });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Update user error:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.post("/api/users/:id/reset-password", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const { password } = req.body;
+      if (!password || password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const user = await storage.updateUser(req.params.id, { password });
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "PASSWORD_RESET",
+        tableName: "users",
+        recordId: user.id,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json({ message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
     }
   });
 

@@ -8,14 +8,41 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
   url: string,
-  data?: unknown | undefined,
+  options: {
+    method?: string;
+    body?: string;
+    headers?: Record<string, string>;
+  } = {}
 ): Promise<Response> {
+  const { method = "GET", body, headers = {} } = options;
+  
+  // Get CSRF token from cookies if needed for non-GET requests
+  let csrfToken = null;
+  if (method !== "GET") {
+    try {
+      const tokenResponse = await fetch("/api/csrf-token", {
+        credentials: "include",
+      });
+      if (tokenResponse.ok) {
+        const tokenData = await tokenResponse.json();
+        csrfToken = tokenData.csrfToken;
+      }
+    } catch (error) {
+      console.warn("Failed to fetch CSRF token:", error);
+    }
+  }
+
+  const finalHeaders = {
+    ...headers,
+    ...(body && { "Content-Type": "application/json" }),
+    ...(csrfToken && { "X-CSRF-Token": csrfToken }),
+  };
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers: finalHeaders,
+    body,
     credentials: "include",
   });
 
