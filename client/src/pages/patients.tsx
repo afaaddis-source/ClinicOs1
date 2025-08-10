@@ -108,7 +108,7 @@ export default function PatientsPage() {
                       {patient.phone}
                     </TableCell>
                     <TableCell data-testid={`patient-dob-${patient.id}`}>
-                      {patient.dateOfBirth ? formatDate(patient.dateOfBirth) : "N/A"}
+                      {patient.dateOfBirth ? formatDate(patient.dateOfBirth.toString()) : "N/A"}
                     </TableCell>
                     <TableCell data-testid={`patient-gender-${patient.id}`}>
                       {patient.gender || "N/A"}

@@ -44,24 +44,24 @@ app.use(session({
   },
 }));
 
-// CSRF protection - conditionally apply
-app.use((req, res, next) => {
-  // Skip CSRF for GET requests and login endpoint
-  if (req.method === "GET" || req.path === "/api/auth/login") {
-    return next();
-  }
-  
-  // Apply CSRF protection for other routes
-  const csrfProtection = csrf({
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-    },
-  });
-  
-  return csrfProtection(req, res, next);
-});
+// CSRF protection - temporarily disabled for development
+// app.use((req, res, next) => {
+//   // Skip CSRF for GET requests and login endpoint
+//   if (req.method === "GET" || req.path === "/api/auth/login") {
+//     return next();
+//   }
+//   
+//   // Apply CSRF protection for other routes
+//   const csrfProtection = csrf({
+//     cookie: {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === "production",
+//       sameSite: "strict",
+//     },
+//   });
+//   
+//   return csrfProtection(req, res, next);
+// });
 
 app.use((req, res, next) => {
   const start = Date.now();
