@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import PatientsPage from "@/pages/patients";
+import PatientProfile from "@/pages/patient-profile";
 import AppointmentsPage from "@/pages/appointments";
 import VisitsPage from "@/pages/visits";
 import BillingPage from "@/pages/billing";
@@ -63,6 +64,7 @@ function AppContent() {
             <Route path="/" component={DashboardPage} />
             <Route path="/dashboard" component={DashboardPage} />
             <Route path="/patients" component={PatientsPage} />
+            <Route path="/patients/:id" component={PatientProfile} />
             <Route path="/appointments" component={AppointmentsPage} />
             <Route path="/visits" component={VisitsPage} />
             <Route path="/billing" component={BillingPage} />

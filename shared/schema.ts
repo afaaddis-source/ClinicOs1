@@ -151,6 +151,21 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
 
+// Patient Files table
+export const patientFiles = pgTable("patient_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  originalName: text("original_name").notNull(),
+  filePath: text("file_path").notNull(),
+  fileSize: integer("file_size").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileType: text("file_type").notNull(), // "image" or "document"
+  uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+
 // Audit Log table
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -178,7 +193,8 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const patientsRelations = relations(patients, ({ many }) => ({
   appointments: many(appointments),
   visits: many(visits),
-  invoices: many(invoices)
+  invoices: many(invoices),
+  files: many(patientFiles)
 }));
 
 export const servicesRelations = relations(services, ({ many }) => ({
@@ -263,6 +279,17 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   })
 }));
 
+export const patientFilesRelations = relations(patientFiles, ({ one }) => ({
+  patient: one(patients, {
+    fields: [patientFiles.patientId],
+    references: [patients.id]
+  }),
+  uploadedBy: one(users, {
+    fields: [patientFiles.uploadedBy],
+    references: [users.id]
+  })
+}));
+
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   user: one(users, {
     fields: [auditLogs.userId],
@@ -281,6 +308,11 @@ export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
   updatedAt: true
+}).extend({
+  civilId: z.string().min(12).max(12).regex(/^\d{12}$/, "Civil ID must be exactly 12 digits"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  phone: z.string().min(8, "Phone number is required"),
 });
 
 export const insertServiceSchema = createInsertSchema(services).omit({
@@ -317,6 +349,11 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   createdAt: true
 });
 
+export const insertPatientFileSchema = createInsertSchema(patientFiles).omit({
+  id: true,
+  createdAt: true
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -341,5 +378,8 @@ export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
 
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+
+export type PatientFile = typeof patientFiles.$inferSelect;
+export type InsertPatientFile = z.infer<typeof insertPatientFileSchema>;
 
 export type AuditLog = typeof auditLogs.$inferSelect;

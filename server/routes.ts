@@ -1,5 +1,9 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
+import type { Request as MulterRequest } from "express";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import {
   insertUserSchema,
@@ -9,6 +13,7 @@ import {
   insertVisitSchema,
   insertInvoiceSchema,
   insertPaymentSchema,
+  insertPatientFileSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -41,6 +46,71 @@ const requireRole = (roles: string[]) => {
     next();
   };
 };
+
+// Patient update permission check (role-based field restrictions)
+const checkPatientUpdatePermissions = (req: Request, res: Response, next: any) => {
+  const userRole = req.session.user?.role;
+  const updateData = req.body;
+  
+  // Doctor can only update clinical fields
+  if (userRole === "DOCTOR") {
+    const allowedFields = ["notes", "allergies", "medicalHistory"];
+    const requestFields = Object.keys(updateData);
+    const invalidFields = requestFields.filter(field => !allowedFields.includes(field));
+    
+    if (invalidFields.length > 0) {
+      return res.status(403).json({ 
+        error: "Doctors can only update clinical fields (notes, allergies, medical history)" 
+      });
+    }
+  }
+  
+  // Accountant has read-only access
+  if (userRole === "ACCOUNTANT") {
+    return res.status(403).json({ error: "Accountants have read-only access to patient data" });
+  }
+  
+  next();
+};
+
+// File upload configuration
+const storage_config = multer.diskStorage({
+  destination: (req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+    const patientId = (req as any).params.patientId;
+    const uploadPath = path.join(process.cwd(), 'uploads', patientId);
+    
+    // Create directory if it doesn't exist
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+  }
+});
+
+const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  // Allow images and PDFs only
+  const allowedMimes = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 
+    'application/pdf'
+  ];
+  
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(null, false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage_config,
+  fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session middleware setup
@@ -296,32 +366,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/patients", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const patientData = insertPatientSchema.parse(req.body);
-      const patient = await storage.createPatient(patientData);
-      
-      await storage.createAuditLog({
-        userId: req.session.user?.id,
-        action: "CREATE",
-        tableName: "patients",
-        recordId: patient.id,
-        newValues: patientData,
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      });
 
-      res.status(201).json(patient);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Validation error", details: error.errors });
-      }
-      console.error("Create patient error:", error);
-      res.status(500).json({ error: "Failed to create patient" });
-    }
-  });
 
-  app.put("/api/patients/:id", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/patients/:id", requireAuth, checkPatientUpdatePermissions, async (req: Request, res: Response) => {
     try {
       const patientData = insertPatientSchema.partial().parse(req.body);
       const oldPatient = await storage.getPatient(req.params.id);
@@ -349,6 +396,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Update patient error:", error);
       res.status(500).json({ error: "Failed to update patient" });
+    }
+  });
+
+  app.post("/api/patients", requireAuth, requireRole(["ADMIN", "RECEPTION"]), async (req: Request, res: Response) => {
+    try {
+      const patientData = insertPatientSchema.parse(req.body);
+      
+      // Check if civil ID already exists
+      const existingPatient = await storage.getPatientByCivilId(patientData.civilId);
+      if (existingPatient) {
+        return res.status(400).json({ error: "Patient with this Civil ID already exists" });
+      }
+      
+      const patient = await storage.createPatient(patientData);
+      
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "CREATE",
+        tableName: "patients",
+        recordId: patient.id,
+        newValues: patientData,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.status(201).json(patient);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Create patient error:", error);
+      res.status(500).json({ error: "Failed to create patient" });
+    }
+  });
+
+  // Patient file management routes
+  app.get("/api/patients/:id/files", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const files = await storage.getPatientFiles(req.params.id);
+      res.json(files);
+    } catch (error) {
+      console.error("Get patient files error:", error);
+      res.status(500).json({ error: "Failed to fetch patient files" });
+    }
+  });
+
+  app.post("/api/patients/:patientId/files", requireAuth, upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Verify patient exists
+      const patient = await storage.getPatient(req.params.patientId);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      const fileType = req.file.mimetype.startsWith('image/') ? 'image' : 'document';
+      
+      const fileData = {
+        patientId: req.params.patientId,
+        fileName: req.file.filename,
+        originalName: req.file.originalname,
+        filePath: req.file.path,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        fileType,
+        uploadedBy: req.session.user!.id,
+        description: req.body.description || ''
+      };
+
+      const patientFile = await storage.createPatientFile(fileData);
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "FILE_UPLOAD",
+        tableName: "patient_files",
+        recordId: patientFile.id,
+        newValues: { ...fileData, filePath: "[HIDDEN]" },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.status(201).json(patientFile);
+    } catch (error) {
+      console.error("Upload file error:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  app.get("/api/patients/:patientId/files/:fileId/download", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const file = await storage.getPatientFile(req.params.fileId);
+      if (!file || file.patientId !== req.params.patientId) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      // Check if file exists on disk
+      if (!fs.existsSync(file.filePath)) {
+        return res.status(404).json({ error: "File not found on disk" });
+      }
+
+      res.setHeader('Content-Disposition', `attachment; filename="${file.originalName}"`);
+      res.setHeader('Content-Type', file.mimeType);
+      
+      res.sendFile(path.resolve(file.filePath));
+    } catch (error) {
+      console.error("Download file error:", error);
+      res.status(500).json({ error: "Failed to download file" });
+    }
+  });
+
+  app.delete("/api/patients/:patientId/files/:fileId", requireAuth, requireRole(["ADMIN", "RECEPTION"]), async (req: Request, res: Response) => {
+    try {
+      const file = await storage.getPatientFile(req.params.fileId);
+      if (!file || file.patientId !== req.params.patientId) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      const deleted = await storage.deletePatientFile(req.params.fileId);
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete file from database" });
+      }
+
+      // Delete physical file
+      if (fs.existsSync(file.filePath)) {
+        fs.unlinkSync(file.filePath);
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "FILE_DELETE",
+        tableName: "patient_files",
+        recordId: file.id,
+        oldValues: { ...file, filePath: "[HIDDEN]" },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json({ message: "File deleted successfully" });
+    } catch (error) {
+      console.error("Delete file error:", error);
+      res.status(500).json({ error: "Failed to delete file" });
     }
   });
 

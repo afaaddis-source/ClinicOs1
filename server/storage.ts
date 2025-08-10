@@ -11,6 +11,7 @@ import {
   invoices,
   invoiceItems,
   payments,
+  patientFiles,
   auditLogs,
   type User,
   type InsertUser,
@@ -28,6 +29,8 @@ import {
   type InsertInvoiceItem,
   type Payment,
   type InsertPayment,
+  type PatientFile,
+  type InsertPatientFile,
   type AuditLog,
 } from "@shared/schema";
 
@@ -53,6 +56,12 @@ export interface IStorage {
   deletePatient(id: string): Promise<boolean>;
   getAllPatients(): Promise<Patient[]>;
   searchPatients(searchTerm: string): Promise<Patient[]>;
+
+  // Patient file management
+  getPatientFiles(patientId: string): Promise<PatientFile[]>;
+  createPatientFile(file: InsertPatientFile): Promise<PatientFile>;
+  deletePatientFile(id: string): Promise<boolean>;
+  getPatientFile(id: string): Promise<PatientFile | undefined>;
 
   // Service management
   getService(id: string): Promise<Service | undefined>;
@@ -227,6 +236,26 @@ export class PostgreSQLStorage implements IStorage {
         sql`(${patients.firstName} ILIKE ${searchPattern} OR ${patients.lastName} ILIKE ${searchPattern} OR ${patients.phone} ILIKE ${searchPattern} OR ${patients.civilId} ILIKE ${searchPattern})`
       )
     ).orderBy(patients.firstName, patients.lastName);
+  }
+
+  // Patient file management
+  async getPatientFiles(patientId: string): Promise<PatientFile[]> {
+    return await db.select().from(patientFiles).where(eq(patientFiles.patientId, patientId)).orderBy(desc(patientFiles.createdAt));
+  }
+
+  async createPatientFile(file: InsertPatientFile): Promise<PatientFile> {
+    const result = await db.insert(patientFiles).values(file).returning();
+    return result[0];
+  }
+
+  async deletePatientFile(id: string): Promise<boolean> {
+    const result = await db.delete(patientFiles).where(eq(patientFiles.id, id));
+    return result.rowCount > 0;
+  }
+
+  async getPatientFile(id: string): Promise<PatientFile | undefined> {
+    const result = await db.select().from(patientFiles).where(eq(patientFiles.id, id)).limit(1);
+    return result[0];
   }
 
   // Service management
