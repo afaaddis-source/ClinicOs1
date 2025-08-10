@@ -1,0 +1,48 @@
+You are an AI Software Engineer on Replit.
+Create a production-ready web app called "ClinicOS" (Arabic-first) with:
+
+STACK
+- Node.js 20, Express 4, EJS views.
+- Prisma ORM with SQLite at ./prisma/dev.db (easily switchable to Postgres later).
+- Sessions (express-session), bcrypt, helmet, csurf, zod for validation.
+- i18next (+ i18next-fs-backend) with full RTL support; default language AR.
+- Bootstrap 5 (CDN). Theme with CSS variables: --primary:#1f6fd6; --accent:#48c1ef. (Keep in /public/css/theme.css so colors are easy to change to match the reference site.)
+- Multer for file uploads to ./uploads (NEVER serve raw; use auth checks).
+
+FILES & STRUCTURE
+- package.json with scripts: dev, build, start, prisma:generate, prisma:migrate, seed.
+- /prisma/schema.prisma defining models (see below) + seed.ts.
+- /src/server.ts, /src/routes/*.ts, /src/middleware/*.ts, /src/controllers/*.ts, /src/lib/*.ts.
+- /views/{layout.ejs, auth/login.ejs, dashboard/index.ejs, patients/*.ejs, appointments/*.ejs, visits/*.ejs, billing/*.ejs, admin/*.ejs}
+- /locales/{ar.json,en.json} with base strings (nav, forms, validation).
+- /public/{css/theme.css, js/app.js}
+- .env.example: SESSION_SECRET=..., BASE_URL=..., UPLOAD_DIR=./uploads
+
+RBAC ROLES
+enum Role { ADMIN, RECEPTION, DOCTOR, ACCOUNTANT }
+
+PRISMA SCHEMA (initial)
+User(id, username unique, passwordHash, role enum)
+Patient(id, civilId unique, name, phone, dob, gender, allergies, createdAt)
+Service(id, code unique, nameAr, nameEn, price, defaultMinutes)
+Appointment(id, patientId, serviceId, doctorId, start, end, status enum('SCHEDULED','COMPLETED','CANCELLED','NO_SHOW'), notes)
+Visit(id, patientId, doctorId, appointmentId nullable, date, diagnosis, proceduresJson, toothMapJson, notes)
+File(id, patientId, visitId nullable, path, mime, size, createdAt)
+Invoice(id, patientId, total, discount, tax, status enum('UNPAID','PARTIAL','PAID'), issuedAt)
+InvoiceItem(id, invoiceId, serviceId, qty, price)
+Payment(id, invoiceId, amount, method enum('CASH','KNET','CARD','OTHER'), txnRef, paidAt, createdBy)
+AuditLog(id, actorId, entity, entityId, action, diffJson, at)
+
+SEED
+- Create 4 users: admin/reception/doctor/accountant (password '123456').
+- Seed a few services (Scaling 15, Whitening 150, Root Canal 90).
+- Seed 1 demo patient and appointment.
+
+SECURITY
+- Helmet, CSRF on all POST, input validation with zod.
+- File uploads saved to ./uploads with whitelist mime and size limit 10MB.
+
+ACCEPTANCE
+- `npm run dev` starts the app.
+- /login shows Arabic login; after login, /dashboard loads.
+- Navbar with language toggle (AR/EN). When AR, set dir="rtl".
