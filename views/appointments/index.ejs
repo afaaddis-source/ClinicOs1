@@ -1,0 +1,297 @@
+<% layout('layout') %>
+
+<!-- Language Toggle -->
+<div class="position-fixed top-0 start-0 m-3" style="z-index: 1001;">
+    <button class="btn btn-light btn-sm" onclick="toggleLanguage()">
+        <i class="fas fa-globe me-1"></i>
+        <span id="langText"><%= i18n.language === 'ar' ? 'EN' : 'عربي' %></span>
+    </button>
+</div>
+
+<!-- Mobile Toggle -->
+<button class="mobile-toggle" onclick="toggleSidebar()">
+    <i class="fas fa-bars"></i>
+</button>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+    <div class="p-3">
+        <div class="navbar-brand mb-4">
+            <i class="fas fa-stethoscope me-2"></i>
+            <span><%= t('app.name') %></span>
+        </div>
+        
+        <!-- User Info -->
+        <div class="text-center mb-4 p-3" style="background-color: rgba(255, 255, 255, 0.1); border-radius: 12px;">
+            <div class="d-flex align-items-center">
+                <div class="bg-white rounded-circle p-2 me-3">
+                    <i class="fas fa-user-md text-primary"></i>
+                </div>
+                <div class="text-start">
+                    <div class="fw-bold text-white"><%= user.username %></div>
+                    <small class="text-white-50"><%= t('roles.' + user.role.toLowerCase()) %></small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation Menu -->
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="/dashboard">
+                    <i class="fas fa-tachometer-alt me-2"></i>
+                    <span><%= t('nav.dashboard') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/patients">
+                    <i class="fas fa-users me-2"></i>
+                    <span><%= t('nav.patients') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/appointments">
+                    <i class="fas fa-calendar-alt me-2"></i>
+                    <span><%= t('nav.appointments') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/visits">
+                    <i class="fas fa-notes-medical me-2"></i>
+                    <span><%= t('nav.visits') %></span>
+                </a>
+            </li>
+            <% if (user.role === 'ACCOUNTANT' || user.role === 'ADMIN') { %>
+            <li class="nav-item">
+                <a class="nav-link" href="/billing">
+                    <i class="fas fa-file-invoice me-2"></i>
+                    <span><%= t('nav.billing') %></span>
+                </a>
+            </li>
+            <% } %>
+            <% if (user.role === 'ADMIN') { %>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/services">
+                    <i class="fas fa-cog me-2"></i>
+                    <span><%= t('nav.services') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/users">
+                    <i class="fas fa-users-cog me-2"></i>
+                    <span><%= t('nav.users') %></span>
+                </a>
+            </li>
+            <% } %>
+            <li class="nav-item mt-3">
+                <form action="/auth/logout" method="POST" class="d-inline">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="nav-link border-0 bg-transparent text-start w-100">
+                        <i class="fas fa-sign-out-alt me-2"></i>
+                        <span><%= t('nav.logout') %></span>
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main-content" id="mainContent">
+    <!-- Header -->
+    <div class="bg-white shadow-sm mb-4">
+        <div class="container-fluid p-3">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h2 class="mb-0 fw-bold text-dark"><%= t('appointments.title') %></h2>
+                    <p class="text-muted mb-0"><%= new Date(filters.date).toLocaleDateString(i18n.language) %></p>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex gap-2">
+                        <a href="/appointments/new" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>
+                            <%= t('appointments.add_new') %>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <% if (typeof success !== 'undefined' && success) { %>
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fas fa-check-circle me-2"></i>
+                <%= success %>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <% } %>
+
+        <!-- Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="GET" action="/appointments" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="date" class="form-label"><%= t('appointments.date_time') %></label>
+                        <input type="date" class="form-control" id="date" name="date" value="<%= filters.date %>">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="status" class="form-label"><%= t('appointments.status') %></label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">-- <%= t('actions.all') %> --</option>
+                            <option value="SCHEDULED" <%= filters.status === 'SCHEDULED' ? 'selected' : '' %>>
+                                <%= t('status.scheduled') %>
+                            </option>
+                            <option value="COMPLETED" <%= filters.status === 'COMPLETED' ? 'selected' : '' %>>
+                                <%= t('status.completed') %>
+                            </option>
+                            <option value="CANCELLED" <%= filters.status === 'CANCELLED' ? 'selected' : '' %>>
+                                <%= t('status.cancelled') %>
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="doctor" class="form-label"><%= t('appointments.doctor') %></label>
+                        <select class="form-select" id="doctor" name="doctor">
+                            <option value="">-- <%= t('actions.all') %> --</option>
+                            <% doctors.forEach(doctor => { %>
+                                <option value="<%= doctor.id %>" <%= filters.doctor === doctor.id ? 'selected' : '' %>>
+                                    <%= doctor.username %>
+                                </option>
+                            <% }); %>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-filter me-1"></i>
+                            <%= t('actions.filter') %>
+                        </button>
+                        <a href="/appointments" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Appointments List -->
+        <div class="row">
+            <% if (appointments.length === 0) { %>
+                <div class="col-12">
+                    <div class="text-center py-5">
+                        <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted"><%= t('dashboard.no_appointments_today') %></h5>
+                        <a href="/appointments/new" class="btn btn-primary mt-3">
+                            <i class="fas fa-plus me-1"></i>
+                            <%= t('appointments.add_new') %>
+                        </a>
+                    </div>
+                </div>
+            <% } else { %>
+                <% appointments.forEach(appointment => { %>
+                    <div class="col-lg-6 mb-4">
+                        <div class="appointment-card card <%= appointment.status === 'COMPLETED' ? 'completed' : appointment.status === 'CANCELLED' ? 'urgent' : '' %>">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <div class="fw-bold text-primary fs-5">
+                                                <%= new Date(appointment.start).toLocaleTimeString(i18n.language, {hour: '2-digit', minute: '2-digit'}) %>
+                                            </div>
+                                            <small class="text-muted">
+                                                <%= new Date(appointment.start).toLocaleDateString(i18n.language, {day: 'numeric', month: 'short'}) %>
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="fw-bold"><%= appointment.patient.name %></div>
+                                        <small class="text-muted d-block"><%= appointment.patient.phone %></small>
+                                        <span class="badge bg-info mt-1">
+                                            <%= i18n.language === 'ar' ? appointment.service.nameAr : appointment.service.nameEn %>
+                                        </span>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-user-md me-1"></i>
+                                                <%= appointment.doctor.username %>
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 text-end">
+                                        <div class="mb-2">
+                                            <% if (appointment.status === 'SCHEDULED') { %>
+                                                <span class="badge bg-warning"><%= t('status.scheduled') %></span>
+                                            <% } else if (appointment.status === 'COMPLETED') { %>
+                                                <span class="badge bg-success"><%= t('status.completed') %></span>
+                                            <% } else if (appointment.status === 'CANCELLED') { %>
+                                                <span class="badge bg-danger"><%= t('status.cancelled') %></span>
+                                            <% } %>
+                                        </div>
+                                        <div class="btn-group-vertical btn-group-sm">
+                                            <% if (appointment.status === 'SCHEDULED') { %>
+                                                <button class="btn btn-outline-success btn-sm" 
+                                                        onclick="updateAppointmentStatus('<%= appointment.id %>', 'COMPLETED')">
+                                                    <i class="fas fa-check me-1"></i>
+                                                    <%= t('status.completed') %>
+                                                </button>
+                                                <a href="/appointments/<%= appointment.id %>/edit" class="btn btn-outline-primary btn-sm">
+                                                    <i class="fas fa-edit me-1"></i>
+                                                    <%= t('actions.edit') %>
+                                                </a>
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        onclick="updateAppointmentStatus('<%= appointment.id %>', 'CANCELLED')">
+                                                    <i class="fas fa-times me-1"></i>
+                                                    <%= t('actions.cancel') %>
+                                                </button>
+                                            <% } else if (appointment.status === 'COMPLETED') { %>
+                                                <a href="/visits/new?appointmentId=<%= appointment.id %>" class="btn btn-outline-info btn-sm">
+                                                    <i class="fas fa-notes-medical me-1"></i>
+                                                    <%= t('visits.add_visit') %>
+                                                </a>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                </div>
+                                <% if (appointment.notes) { %>
+                                    <div class="row mt-2">
+                                        <div class="col-12">
+                                            <small class="text-muted">
+                                                <i class="fas fa-sticky-note me-1"></i>
+                                                <%= appointment.notes %>
+                                            </small>
+                                        </div>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                <% }); %>
+            <% } %>
+        </div>
+    </div>
+</main>
+
+<script>
+function updateAppointmentStatus(appointmentId, status) {
+    if (confirm('<%= t("appointments.confirm_status_change") %>')) {
+        fetch(`/appointments/${appointmentId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify({ status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('<%= t("error.update_failed") %>');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('<%= t("error.network_error") %>');
+        });
+    }
+}
+</script>

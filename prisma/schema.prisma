@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum Role {
+  ADMIN
+  RECEPTION
+  DOCTOR
+  ACCOUNTANT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  KNET
+  CARD
+  OTHER
+}
+
+model User {
+  id            String      @id @default(cuid())
+  username      String      @unique
+  passwordHash  String
+  role          Role
+  createdAt     DateTime    @default(now())
+  
+  // Relations
+  auditLogs     AuditLog[]
+  paymentsCreated Payment[] @relation("PaymentCreatedBy")
+  appointments  Appointment[] @relation("DoctorAppointments")
+  visits        Visit[]     @relation("DoctorVisits")
+}
+
+model Patient {
+  id          String    @id @default(cuid())
+  civilId     String    @unique
+  name        String
+  phone       String
+  dob         DateTime?
+  gender      Gender?
+  allergies   String?
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  appointments Appointment[]
+  visits       Visit[]
+  files        File[]
+  invoices     Invoice[]
+}
+
+model Service {
+  id             String  @id @default(cuid())
+  code           String  @unique
+  nameAr         String
+  nameEn         String
+  price          Float
+  defaultMinutes Int
+  
+  // Relations
+  appointments   Appointment[]
+  invoiceItems   InvoiceItem[]
+}
+
+model Appointment {
+  id         String            @id @default(cuid())
+  patientId  String
+  serviceId  String
+  doctorId   String
+  start      DateTime
+  end        DateTime
+  status     AppointmentStatus @default(SCHEDULED)
+  notes      String?
+  createdAt  DateTime          @default(now())
+  
+  // Relations
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  service    Service  @relation(fields: [serviceId], references: [id])
+  doctor     User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  visit      Visit?
+}
+
+model Visit {
+  id             String       @id @default(cuid())
+  patientId      String
+  doctorId       String
+  appointmentId  String?      @unique
+  date           DateTime
+  diagnosis      String?
+  proceduresJson String?      // JSON array of procedures
+  toothMapJson   String?      // JSON tooth map data
+  notes          String?
+  createdAt      DateTime     @default(now())
+  
+  // Relations
+  patient        Patient      @relation(fields: [patientId], references: [id])
+  doctor         User         @relation("DoctorVisits", fields: [doctorId], references: [id])
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id])
+  files          File[]
+}
+
+model File {
+  id        String   @id @default(cuid())
+  patientId String
+  visitId   String?
+  path      String
+  mime      String
+  size      Int
+  createdAt DateTime @default(now())
+  
+  // Relations
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  visit     Visit?   @relation(fields: [visitId], references: [id])
+}
+
+model Invoice {
+  id        String        @id @default(cuid())
+  patientId String
+  total     Float
+  discount  Float         @default(0)
+  tax       Float         @default(0)
+  status    InvoiceStatus @default(UNPAID)
+  issuedAt  DateTime      @default(now())
+  
+  // Relations
+  patient   Patient       @relation(fields: [patientId], references: [id])
+  items     InvoiceItem[]
+  payments  Payment[]
+}
+
+model InvoiceItem {
+  id        String  @id @default(cuid())
+  invoiceId String
+  serviceId String
+  qty       Int     @default(1)
+  price     Float
+  
+  // Relations
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  service   Service @relation(fields: [serviceId], references: [id])
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  invoiceId String
+  amount    Float
+  method    PaymentMethod
+  txnRef    String?
+  paidAt    DateTime      @default(now())
+  createdBy String
+  
+  // Relations
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id])
+  createdByUser User      @relation("PaymentCreatedBy", fields: [createdBy], references: [id])
+}
+
+model AuditLog {
+  id       String   @id @default(cuid())
+  actorId  String
+  entity   String
+  entityId String
+  action   String
+  diffJson String?  // JSON diff of changes
+  at       DateTime @default(now())
+  
+  // Relations
+  actor    User     @relation(fields: [actorId], references: [id])
+}

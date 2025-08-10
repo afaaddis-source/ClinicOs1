@@ -1,0 +1,345 @@
+<% layout('layout') %>
+
+<!-- Language Toggle -->
+<div class="position-fixed top-0 start-0 m-3" style="z-index: 1001;">
+    <button class="btn btn-light btn-sm" onclick="toggleLanguage()">
+        <i class="fas fa-globe me-1"></i>
+        <span id="langText"><%= i18n.language === 'ar' ? 'EN' : 'عربي' %></span>
+    </button>
+</div>
+
+<!-- Mobile Toggle -->
+<button class="mobile-toggle" onclick="toggleSidebar()">
+    <i class="fas fa-bars"></i>
+</button>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+    <div class="p-3">
+        <div class="navbar-brand mb-4">
+            <i class="fas fa-stethoscope me-2"></i>
+            <span><%= t('app.name') %></span>
+        </div>
+        
+        <!-- User Info -->
+        <div class="text-center mb-4 p-3" style="background-color: rgba(255, 255, 255, 0.1); border-radius: 12px;">
+            <div class="d-flex align-items-center">
+                <div class="bg-white rounded-circle p-2 me-3">
+                    <i class="fas fa-user-md text-primary"></i>
+                </div>
+                <div class="text-start">
+                    <div class="fw-bold text-white"><%= user.username %></div>
+                    <small class="text-white-50"><%= t('roles.' + user.role.toLowerCase()) %></small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation Menu -->
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link active" href="/dashboard">
+                    <i class="fas fa-tachometer-alt me-2"></i>
+                    <span><%= t('nav.dashboard') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/patients">
+                    <i class="fas fa-users me-2"></i>
+                    <span><%= t('nav.patients') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/appointments">
+                    <i class="fas fa-calendar-alt me-2"></i>
+                    <span><%= t('nav.appointments') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/visits">
+                    <i class="fas fa-notes-medical me-2"></i>
+                    <span><%= t('nav.visits') %></span>
+                </a>
+            </li>
+            <% if (user.role === 'ACCOUNTANT' || user.role === 'ADMIN') { %>
+            <li class="nav-item">
+                <a class="nav-link" href="/billing">
+                    <i class="fas fa-file-invoice me-2"></i>
+                    <span><%= t('nav.billing') %></span>
+                </a>
+            </li>
+            <% } %>
+            <% if (user.role === 'ADMIN') { %>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/services">
+                    <i class="fas fa-cog me-2"></i>
+                    <span><%= t('nav.services') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/users">
+                    <i class="fas fa-users-cog me-2"></i>
+                    <span><%= t('nav.users') %></span>
+                </a>
+            </li>
+            <% } %>
+            <li class="nav-item mt-3">
+                <form action="/auth/logout" method="POST" class="d-inline">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="nav-link border-0 bg-transparent text-start w-100">
+                        <i class="fas fa-sign-out-alt me-2"></i>
+                        <span><%= t('nav.logout') %></span>
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main-content" id="mainContent">
+    <!-- Header -->
+    <div class="bg-white shadow-sm mb-4">
+        <div class="container-fluid p-3">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h2 class="mb-0 fw-bold text-dark"><%= t('dashboard.welcome_back') %></h2>
+                    <p class="text-muted mb-0"><%= t('dashboard.today_overview') %></p>
+                </div>
+                <div class="col-md-6">
+                    <div class="search-bar p-2">
+                        <div class="input-group">
+                            <input type="text" class="form-control border-0" 
+                                   placeholder="<%= t('dashboard.search_placeholder') %>">
+                            <button class="btn btn-link text-muted" type="button">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card stats-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <h6 class="card-subtitle mb-2 opacity-75"><%= t('dashboard.todays_appointments') %></h6>
+                                <div class="display-6"><%= stats.todayAppointments %></div>
+                            </div>
+                            <div class="ms-3">
+                                <i class="fas fa-calendar-day fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <h6 class="card-subtitle mb-2 text-muted"><%= t('dashboard.total_patients') %></h6>
+                                <div class="display-6 text-success"><%= stats.totalPatients.toLocaleString() %></div>
+                            </div>
+                            <div class="ms-3">
+                                <i class="fas fa-users fa-2x text-success"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <h6 class="card-subtitle mb-2 text-muted"><%= t('dashboard.pending_payments') %></h6>
+                                <div class="display-6 text-warning"><%= stats.pendingPayments.toFixed(2) %> <%= t('currency') %></div>
+                            </div>
+                            <div class="ms-3">
+                                <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <h6 class="card-subtitle mb-2 text-muted"><%= t('dashboard.monthly_revenue') %></h6>
+                                <div class="display-6 text-primary"><%= stats.monthlyRevenue.toFixed(2) %> <%= t('currency') %></div>
+                            </div>
+                            <div class="ms-3">
+                                <i class="fas fa-chart-line fa-2x text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Today's Appointments -->
+            <div class="col-lg-8 mb-4">
+                <div class="card">
+                    <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0"><%= t('dashboard.todays_schedule') %></h5>
+                        <a href="/appointments/new" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i>
+                            <span><%= t('appointments.add_new') %></span>
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <% if (todayAppointments.length === 0) { %>
+                            <div class="text-center py-4">
+                                <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                                <p class="text-muted"><%= t('dashboard.no_appointments_today') %></p>
+                                <a href="/appointments/new" class="btn btn-primary">
+                                    <i class="fas fa-plus me-1"></i>
+                                    <%= t('appointments.schedule_first') %>
+                                </a>
+                            </div>
+                        <% } else { %>
+                            <% todayAppointments.forEach(appointment => { %>
+                                <div class="appointment-card card mb-3 <%= appointment.status === 'COMPLETED' ? 'completed' : appointment.status === 'CANCELLED' ? 'urgent' : '' %>">
+                                    <div class="card-body">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-2">
+                                                <div class="text-center">
+                                                    <div class="fw-bold text-primary">
+                                                        <%= new Date(appointment.start).toLocaleTimeString(i18n.language, {hour: '2-digit', minute: '2-digit'}) %>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="fw-bold"><%= appointment.patient.name %></div>
+                                                <small class="text-muted"><%= appointment.patient.phone %></small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <span class="badge bg-info">
+                                                    <%= i18n.language === 'ar' ? appointment.service.nameAr : appointment.service.nameEn %>
+                                                </span>
+                                            </div>
+                                            <div class="col-md-3 text-end">
+                                                <% if (appointment.status === 'SCHEDULED') { %>
+                                                    <button class="btn btn-outline-success btn-sm me-1" onclick="updateAppointmentStatus('<%= appointment.id %>', 'COMPLETED')">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <a href="/appointments/<%= appointment.id %>/edit" class="btn btn-outline-primary btn-sm me-1">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <button class="btn btn-outline-danger btn-sm" onclick="updateAppointmentStatus('<%= appointment.id %>', 'CANCELLED')">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                <% } else if (appointment.status === 'COMPLETED') { %>
+                                                    <a href="/visits/new?appointmentId=<%= appointment.id %>" class="btn btn-outline-info btn-sm">
+                                                        <i class="fas fa-notes-medical me-1"></i>
+                                                        <%= t('visits.add_visit') %>
+                                                    </a>
+                                                <% } %>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions & Recent Patients -->
+            <div class="col-lg-4 mb-4">
+                <!-- Quick Actions -->
+                <div class="card mb-4">
+                    <div class="card-header bg-white border-0">
+                        <h5 class="card-title mb-0"><%= t('dashboard.quick_actions') %></h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="/patients/new" class="btn btn-primary">
+                                <i class="fas fa-user-plus me-2"></i>
+                                <span><%= t('patients.add_new') %></span>
+                            </a>
+                            <a href="/appointments/new" class="btn btn-outline-primary">
+                                <i class="fas fa-calendar-plus me-2"></i>
+                                <span><%= t('appointments.schedule') %></span>
+                            </a>
+                            <% if (user.role === 'ACCOUNTANT' || user.role === 'ADMIN') { %>
+                            <a href="/billing/invoices/new" class="btn btn-outline-success">
+                                <i class="fas fa-file-invoice-dollar me-2"></i>
+                                <span><%= t('billing.create_invoice') %></span>
+                            </a>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Patients -->
+                <div class="card">
+                    <div class="card-header bg-white border-0">
+                        <h5 class="card-title mb-0"><%= t('dashboard.recent_patients') %></h5>
+                    </div>
+                    <div class="card-body">
+                        <% if (recentPatients.length === 0) { %>
+                            <div class="text-center py-3">
+                                <i class="fas fa-users fa-2x text-muted mb-2"></i>
+                                <p class="text-muted mb-0"><%= t('dashboard.no_patients_yet') %></p>
+                            </div>
+                        <% } else { %>
+                            <% recentPatients.forEach(patient => { %>
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="bg-primary bg-gradient rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        <i class="fas fa-user text-white"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold"><%= patient.name %></div>
+                                        <small class="text-muted">
+                                            <%= t('patients.added') %>: <%= new Date(patient.createdAt).toLocaleDateString(i18n.language) %>
+                                        </small>
+                                    </div>
+                                    <a href="/patients/<%= patient.id %>" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </div>
+                            <% }); %>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+function updateAppointmentStatus(appointmentId, status) {
+    if (confirm('<%= t("appointments.confirm_status_change") %>')) {
+        fetch(`/appointments/${appointmentId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify({ status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('<%= t("error.update_failed") %>');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('<%= t("error.network_error") %>');
+        });
+    }
+}
+</script>

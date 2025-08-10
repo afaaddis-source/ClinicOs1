@@ -1,0 +1,409 @@
+<% layout('layout') %>
+
+<!-- Language Toggle -->
+<div class="position-fixed top-0 start-0 m-3" style="z-index: 1001;">
+    <button class="btn btn-light btn-sm" onclick="toggleLanguage()">
+        <i class="fas fa-globe me-1"></i>
+        <span id="langText"><%= i18n.language === 'ar' ? 'EN' : 'عربي' %></span>
+    </button>
+</div>
+
+<!-- Mobile Toggle -->
+<button class="mobile-toggle" onclick="toggleSidebar()">
+    <i class="fas fa-bars"></i>
+</button>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+    <div class="p-3">
+        <div class="navbar-brand mb-4">
+            <i class="fas fa-stethoscope me-2"></i>
+            <span><%= t('app.name') %></span>
+        </div>
+        
+        <!-- User Info -->
+        <div class="text-center mb-4 p-3" style="background-color: rgba(255, 255, 255, 0.1); border-radius: 12px;">
+            <div class="d-flex align-items-center">
+                <div class="bg-white rounded-circle p-2 me-3">
+                    <i class="fas fa-user-md text-primary"></i>
+                </div>
+                <div class="text-start">
+                    <div class="fw-bold text-white"><%= user.username %></div>
+                    <small class="text-white-50"><%= t('roles.' + user.role.toLowerCase()) %></small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation Menu -->
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="/dashboard">
+                    <i class="fas fa-tachometer-alt me-2"></i>
+                    <span><%= t('nav.dashboard') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/patients">
+                    <i class="fas fa-users me-2"></i>
+                    <span><%= t('nav.patients') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/appointments">
+                    <i class="fas fa-calendar-alt me-2"></i>
+                    <span><%= t('nav.appointments') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/visits">
+                    <i class="fas fa-notes-medical me-2"></i>
+                    <span><%= t('nav.visits') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/billing">
+                    <i class="fas fa-file-invoice me-2"></i>
+                    <span><%= t('nav.billing') %></span>
+                </a>
+            </li>
+            <% if (user.role === 'ADMIN') { %>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/services">
+                    <i class="fas fa-cog me-2"></i>
+                    <span><%= t('nav.services') %></span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/users">
+                    <i class="fas fa-users-cog me-2"></i>
+                    <span><%= t('nav.users') %></span>
+                </a>
+            </li>
+            <% } %>
+            <li class="nav-item mt-3">
+                <form action="/auth/logout" method="POST" class="d-inline">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="nav-link border-0 bg-transparent text-start w-100">
+                        <i class="fas fa-sign-out-alt me-2"></i>
+                        <span><%= t('nav.logout') %></span>
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main-content" id="mainContent">
+    <!-- Header -->
+    <div class="bg-white shadow-sm mb-4">
+        <div class="container-fluid p-3">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h2 class="mb-0 fw-bold text-dark"><%= title %></h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="/billing"><%= t('nav.billing') %></a></li>
+                            <li class="breadcrumb-item active"><%= t('billing.create_invoice') %></li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card">
+                    <div class="card-body">
+                        <form action="/billing/invoices" method="POST" id="invoiceForm">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="patientId" class="form-label">
+                                        <%= t('billing.patient') %> <span class="text-danger">*</span>
+                                    </label>
+                                    <select class="form-select" id="patientId" name="patientId" required>
+                                        <option value="">-- <%= t('actions.select') %> --</option>
+                                        <% patients.forEach(patient => { %>
+                                            <option value="<%= patient.id %>">
+                                                <%= patient.name %> - <%= patient.civilId %>
+                                            </option>
+                                        <% }); %>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Invoice Items -->
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    <i class="fas fa-list me-2"></i>
+                                    <%= t('billing.services') %> <span class="text-danger">*</span>
+                                </label>
+                                
+                                <div id="invoice-items">
+                                    <div class="invoice-item border rounded p-3 mb-3">
+                                        <div class="row">
+                                            <div class="col-md-5">
+                                                <label class="form-label"><%= t('billing.service') %></label>
+                                                <select class="form-select service-select" name="items[0][serviceId]" required>
+                                                    <option value="">-- <%= t('actions.select') %> --</option>
+                                                    <% services.forEach(service => { %>
+                                                        <option value="<%= service.id %>" data-price="<%= service.price %>">
+                                                            <%= i18n.language === 'ar' ? service.nameAr : service.nameEn %> 
+                                                            (<%= service.price %> <%= t('currency') %>)
+                                                        </option>
+                                                    <% }); %>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label"><%= t('billing.quantity') %></label>
+                                                <input type="number" class="form-control qty-input" 
+                                                       name="items[0][qty]" value="1" min="1" required>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label"><%= t('billing.unit_price') %></label>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control price-input" 
+                                                           name="items[0][price]" step="0.01" min="0" required>
+                                                    <span class="input-group-text"><%= t('currency') %></span>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-2 d-flex align-items-end">
+                                                <button type="button" class="btn btn-outline-danger w-100" 
+                                                        onclick="removeInvoiceItem(this)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <div class="col-md-12">
+                                                <div class="text-end">
+                                                    <strong><%= t('billing.total') %>: <span class="item-total">0.00</span> <%= t('currency') %></strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button type="button" class="btn btn-outline-primary" onclick="addInvoiceItem()">
+                                    <i class="fas fa-plus me-1"></i>
+                                    <%= t('billing.add_item') %>
+                                </button>
+                            </div>
+
+                            <!-- Invoice Summary -->
+                            <div class="row">
+                                <div class="col-md-6 offset-md-6">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <div class="row mb-3">
+                                                <div class="col-md-6">
+                                                    <label for="discount" class="form-label"><%= t('billing.discount') %></label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="discount" 
+                                                               name="discount" value="0" step="0.01" min="0">
+                                                        <span class="input-group-text"><%= t('currency') %></span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label for="tax" class="form-label"><%= t('billing.tax') %></label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="tax" 
+                                                               name="tax" value="0" step="0.01" min="0">
+                                                        <span class="input-group-text"><%= t('currency') %></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <hr>
+
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span><%= t('billing.subtotal') %>:</span>
+                                                <span id="subtotal">0.00 <%= t('currency') %></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="text-success"><%= t('billing.discount') %>:</span>
+                                                <span class="text-success" id="discount-display">-0.00 <%= t('currency') %></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-3">
+                                                <span><%= t('billing.tax') %>:</span>
+                                                <span id="tax-display">+0.00 <%= t('currency') %></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <strong class="fs-5"><%= t('billing.total') %>:</strong>
+                                                <strong class="fs-5 text-primary" id="grand-total">0.00 <%= t('currency') %></strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 mt-4">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>
+                                    <%= t('billing.create_invoice') %>
+                                </button>
+                                <a href="/billing" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i>
+                                    <%= t('actions.cancel') %>
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+let itemIndex = 1;
+
+function addInvoiceItem() {
+    const container = document.getElementById('invoice-items');
+    const services = <%- JSON.stringify(services) %>;
+    
+    const itemHtml = `
+        <div class="invoice-item border rounded p-3 mb-3">
+            <div class="row">
+                <div class="col-md-5">
+                    <label class="form-label"><%= t('billing.service') %></label>
+                    <select class="form-select service-select" name="items[${itemIndex}][serviceId]" required>
+                        <option value="">-- <%= t('actions.select') %> --</option>
+                        ${services.map(service => 
+                            `<option value="${service.id}" data-price="${service.price}">
+                                ${'<%= i18n.language %>' === 'ar' ? service.nameAr : service.nameEn} (${service.price} <%= t('currency') %>)
+                            </option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label"><%= t('billing.quantity') %></label>
+                    <input type="number" class="form-control qty-input" 
+                           name="items[${itemIndex}][qty]" value="1" min="1" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label"><%= t('billing.unit_price') %></label>
+                    <div class="input-group">
+                        <input type="number" class="form-control price-input" 
+                               name="items[${itemIndex}][price]" step="0.01" min="0" required>
+                        <span class="input-group-text"><%= t('currency') %></span>
+                    </div>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-danger w-100" 
+                            onclick="removeInvoiceItem(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-12">
+                    <div class="text-end">
+                        <strong><%= t('billing.total') %>: <span class="item-total">0.00</span> <%= t('currency') %></strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', itemHtml);
+    itemIndex++;
+    
+    // Add event listeners to new item
+    const newItem = container.lastElementChild;
+    addItemEventListeners(newItem);
+}
+
+function removeInvoiceItem(button) {
+    const items = document.querySelectorAll('.invoice-item');
+    if (items.length > 1) {
+        button.closest('.invoice-item').remove();
+        calculateTotal();
+    }
+}
+
+function addItemEventListeners(item) {
+    const serviceSelect = item.querySelector('.service-select');
+    const qtyInput = item.querySelector('.qty-input');
+    const priceInput = item.querySelector('.price-input');
+    
+    serviceSelect.addEventListener('change', function() {
+        const selectedOption = this.selectedOptions[0];
+        if (selectedOption && selectedOption.dataset.price) {
+            priceInput.value = selectedOption.dataset.price;
+            calculateItemTotal(item);
+        }
+    });
+    
+    qtyInput.addEventListener('input', () => calculateItemTotal(item));
+    priceInput.addEventListener('input', () => calculateItemTotal(item));
+}
+
+function calculateItemTotal(item) {
+    const qty = parseFloat(item.querySelector('.qty-input').value) || 0;
+    const price = parseFloat(item.querySelector('.price-input').value) || 0;
+    const total = qty * price;
+    
+    item.querySelector('.item-total').textContent = total.toFixed(2);
+    calculateTotal();
+}
+
+function calculateTotal() {
+    const items = document.querySelectorAll('.invoice-item');
+    let subtotal = 0;
+    
+    items.forEach(item => {
+        const qty = parseFloat(item.querySelector('.qty-input').value) || 0;
+        const price = parseFloat(item.querySelector('.price-input').value) || 0;
+        subtotal += qty * price;
+    });
+    
+    const discount = parseFloat(document.getElementById('discount').value) || 0;
+    const tax = parseFloat(document.getElementById('tax').value) || 0;
+    const grandTotal = subtotal - discount + tax;
+    
+    document.getElementById('subtotal').textContent = subtotal.toFixed(2) + ' <%= t("currency") %>';
+    document.getElementById('discount-display').textContent = '-' + discount.toFixed(2) + ' <%= t("currency") %>';
+    document.getElementById('tax-display').textContent = '+' + tax.toFixed(2) + ' <%= t("currency") %>';
+    document.getElementById('grand-total').textContent = grandTotal.toFixed(2) + ' <%= t("currency") %>';
+}
+
+// Initialize event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.invoice-item').forEach(addItemEventListeners);
+    
+    document.getElementById('discount').addEventListener('input', calculateTotal);
+    document.getElementById('tax').addEventListener('input', calculateTotal);
+    
+    // Form submission
+    document.getElementById('invoiceForm').addEventListener('submit', function(e) {
+        const items = [];
+        document.querySelectorAll('.invoice-item').forEach(item => {
+            const serviceId = item.querySelector('.service-select').value;
+            const qty = parseInt(item.querySelector('.qty-input').value);
+            const price = parseFloat(item.querySelector('.price-input').value);
+            
+            if (serviceId && qty && price) {
+                items.push({ serviceId, qty, price });
+            }
+        });
+        
+        if (items.length === 0) {
+            e.preventDefault();
+            alert('<%= t("billing.no_items_error") %>');
+            return;
+        }
+        
+        // Add items as hidden inputs
+        const itemsInput = document.createElement('input');
+        itemsInput.type = 'hidden';
+        itemsInput.name = 'items';
+        itemsInput.value = JSON.stringify(items);
+        this.appendChild(itemsInput);
+    });
+});
+</script>

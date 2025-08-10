@@ -1,0 +1,76 @@
+<% layout('layout') %>
+
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+    <!-- Language Toggle -->
+    <div class="position-absolute top-0 start-0 m-3">
+        <button class="btn btn-outline-primary btn-sm" onclick="toggleLanguage()">
+            <i class="fas fa-globe me-1"></i>
+            <span id="langText"><%= i18n.language === 'ar' ? 'EN' : 'عربي' %></span>
+        </button>
+    </div>
+
+    <div class="card shadow" style="width: 100%; max-width: 400px;">
+        <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                    <i class="fas fa-stethoscope fa-2x"></i>
+                </div>
+                <h2 class="h4 fw-bold text-primary">ClinicOS</h2>
+                <p class="text-muted"><%= t('auth.welcome_message') %></p>
+            </div>
+
+            <% if (error) { %>
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <%= error %>
+                </div>
+            <% } %>
+
+            <form action="/auth/login" method="POST">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                
+                <div class="mb-3">
+                    <label for="username" class="form-label"><%= t('auth.username') %></label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-user"></i>
+                        </span>
+                        <input type="text" class="form-control" id="username" name="username" required 
+                               placeholder="<%= t('auth.username_placeholder') %>">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label"><%= t('auth.password') %></label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-lock"></i>
+                        </span>
+                        <input type="password" class="form-control" id="password" name="password" required 
+                               placeholder="<%= t('auth.password_placeholder') %>">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mb-3">
+                    <i class="fas fa-sign-in-alt me-2"></i>
+                    <%= t('auth.login') %>
+                </button>
+            </form>
+
+            <div class="text-center">
+                <small class="text-muted">
+                    <%= t('auth.demo_accounts') %>:<br>
+                    admin/doctor/reception/accountant : 123456
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleLanguage() {
+    const currentLang = document.documentElement.getAttribute('lang');
+    const newLang = currentLang === 'ar' ? 'en' : 'ar';
+    window.location.href = `${window.location.pathname}?lng=${newLang}`;
+}
+</script>
