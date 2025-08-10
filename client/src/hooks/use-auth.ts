@@ -39,6 +39,7 @@ const authApi = {
   logout: async (): Promise<void> => {
     const response = await fetch("/api/auth/logout", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       credentials: "include",
     });
     

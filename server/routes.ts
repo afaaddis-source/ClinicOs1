@@ -179,7 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/logout", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/auth/logout", async (req: Request, res: Response) => {
     const userId = req.session.user?.id;
     
     if (userId) {

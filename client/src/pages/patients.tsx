@@ -18,11 +18,13 @@ export default function PatientsPage() {
 
   const { data: patients = [], isLoading } = useQuery({
     queryKey: ["/api/patients", searchTerm],
-    queryFn: () => {
+    queryFn: async () => {
       const url = searchTerm 
         ? `/api/patients?search=${encodeURIComponent(searchTerm)}`
         : "/api/patients";
-      return apiRequest(url);
+      const response = await apiRequest(url);
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
     },
   });
 
