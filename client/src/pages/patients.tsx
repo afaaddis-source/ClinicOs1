@@ -24,29 +24,37 @@ export default function PatientsPage() {
   // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
+      console.log('Setting debounced search term:', searchTerm);
       setDebouncedSearchTerm(searchTerm);
     }, 300);
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const { data: patients = [], isLoading, error } = useQuery({
+  const { data: patients = [], isLoading, error, refetch } = useQuery({
     queryKey: ["/api/patients", debouncedSearchTerm],
     queryFn: async () => {
       const url = debouncedSearchTerm.trim()
         ? `/api/patients?search=${encodeURIComponent(debouncedSearchTerm.trim())}`
         : "/api/patients";
+      
+      console.log('Making request to:', url);
       const response = await apiRequest(url);
       
       if (!response.ok) {
+        console.error('API request failed:', response.status, response.statusText);
         throw new Error('Failed to fetch patients');
       }
       
       const data = await response.json();
-      console.log('Search results for "' + debouncedSearchTerm + '":', data);
+      console.log('Search term:', debouncedSearchTerm);
+      console.log('Search results:', data);
+      console.log('Number of results:', data.length);
       return Array.isArray(data) ? data : [];
     },
-    staleTime: 30000, // 30 seconds
+    enabled: true,
+    staleTime: 5000, // 5 seconds
+    gcTime: 10000, // 10 seconds (was cacheTime in v4)
   });
 
   const formatDate = (dateString: string) => {
@@ -91,13 +99,29 @@ export default function PatientsPage() {
               <Input
                 placeholder={isArabic ? 'البحث في المرضى...' : 'Search patients...'}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  console.log('Search input changed:', e.target.value);
+                  setSearchTerm(e.target.value);
+                }}
                 className="w-64"
                 data-testid="input-search"
                 dir={isArabic ? 'rtl' : 'ltr'}
               />
               {searchTerm !== debouncedSearchTerm && (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+              {debouncedSearchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setDebouncedSearchTerm('');
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  ×
+                </Button>
               )}
             </div>
           </div>
