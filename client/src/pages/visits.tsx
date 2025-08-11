@@ -110,21 +110,27 @@ export default function VisitsPage() {
   });
 
   // Queries
-  const { data: visits, isLoading } = useQuery({
+  const { data: visitsData, isLoading } = useQuery({
     queryKey: ["/api/visits"],
   });
 
-  const { data: patients } = useQuery({
+  const { data: patientsData } = useQuery({
     queryKey: ["/api/patients"],
   });
 
-  const { data: doctors } = useQuery({
+  const { data: doctorsData } = useQuery({
     queryKey: ["/api/doctors"],
   });
 
-  const { data: services } = useQuery({
+  const { data: servicesData } = useQuery({
     queryKey: ["/api/services"],
   });
+
+  // Ensure data is arrays
+  const visits = Array.isArray(visitsData) ? visitsData : [];
+  const patients = Array.isArray(patientsData) ? patientsData : [];
+  const doctors = Array.isArray(doctorsData) ? doctorsData : [];
+  const services = Array.isArray(servicesData) ? servicesData : [];
 
   const { data: visitDetails, isLoading: visitDetailsLoading } = useQuery({
     queryKey: ["/api/visits", selectedVisitId],
