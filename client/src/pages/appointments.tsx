@@ -128,28 +128,58 @@ export default function AppointmentsPage() {
 
   // Queries
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
-    queryKey: ["/api/appointments/week", currentWeekStart],
-    queryFn: () => apiRequest(`/api/appointments/week?date=${currentWeekStart.toISOString()}`),
+    queryKey: ["/api/appointments/week", format(currentWeekStart, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const response = await apiRequest(`/api/appointments/week?startDate=${format(currentWeekStart, "yyyy-MM-dd")}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch appointments');
+      }
+      return await response.json();
+    },
   });
 
   const { data: todayAppointments = [] } = useQuery({
     queryKey: ["/api/appointments/today"],
-    queryFn: () => apiRequest("/api/appointments/today"),
+    queryFn: async () => {
+      const response = await apiRequest("/api/appointments/today");
+      if (!response.ok) {
+        throw new Error('Failed to fetch today appointments');
+      }
+      return await response.json();
+    },
   });
 
   const { data: patientsData } = useQuery({
     queryKey: ["/api/patients"],
-    queryFn: () => apiRequest("/api/patients"),
+    queryFn: async () => {
+      const response = await apiRequest("/api/patients");
+      if (!response.ok) {
+        throw new Error('Failed to fetch patients');
+      }
+      return await response.json();
+    },
   });
 
   const { data: servicesData } = useQuery({
     queryKey: ["/api/services"],
-    queryFn: () => apiRequest("/api/services"),
+    queryFn: async () => {
+      const response = await apiRequest("/api/services");
+      if (!response.ok) {
+        throw new Error('Failed to fetch services');
+      }
+      return await response.json();
+    },
   });
 
   const { data: doctorsData } = useQuery({
     queryKey: ["/api/doctors"],
-    queryFn: () => apiRequest("/api/doctors"),
+    queryFn: async () => {
+      const response = await apiRequest("/api/doctors");
+      if (!response.ok) {
+        throw new Error('Failed to fetch doctors');
+      }
+      return await response.json();
+    },
   });
 
   // Ensure data is arrays
@@ -158,8 +188,15 @@ export default function AppointmentsPage() {
   const doctors = Array.isArray(doctorsData) ? doctorsData : [];
 
   const { data: availableSlots = [] } = useQuery({
-    queryKey: ["/api/appointments/available-slots", selectedDate],
-    queryFn: () => apiRequest(`/api/appointments/available-slots?date=${selectedDate.toISOString()}&doctorId=${appointmentForm.watch("doctorId") || ""}`),
+    queryKey: ["/api/appointments/available-slots", format(selectedDate, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const response = await apiRequest(`/api/appointments/available-slots?date=${format(selectedDate, "yyyy-MM-dd")}&doctorId=${appointmentForm.watch("doctorId") || ""}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch available slots');
+      }
+      const data = await response.json();
+      return data.slots || [];
+    },
     enabled: isCreateDialogOpen || isRescheduleDialogOpen,
   });
 
@@ -196,7 +233,10 @@ export default function AppointmentsPage() {
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
       });
-      return response as Patient;
+      if (!response.ok) {
+        throw new Error('Failed to create patient');
+      }
+      return await response.json();
     },
     onSuccess: (patient: Patient) => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
@@ -253,7 +293,10 @@ export default function AppointmentsPage() {
 
     try {
       const response = await apiRequest(`/api/patients/lookup/${civilId}`);
-      const patient = response as Patient;
+      if (!response.ok) {
+        throw new Error('Patient not found');
+      }
+      const patient = await response.json();
       setSelectedPatient(patient);
       appointmentForm.setValue('patientId', patient.id);
       toast({
@@ -299,7 +342,7 @@ export default function AppointmentsPage() {
       
       slots.push({
         time: timeStr,
-        available: availableSlots.includes(timeStr),
+        available: Array.isArray(availableSlots) ? availableSlots.includes(timeStr) : false,
       });
     }
     
@@ -361,8 +404,8 @@ export default function AppointmentsPage() {
 
     const getDayAppointments = (date: Date) => {
       return filteredAppointments.filter((apt: AppointmentWithDetails) => 
-        isSameWeek(parseISO(apt.appointmentDate), date) && 
-        format(parseISO(apt.appointmentDate), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+        isSameWeek(parseISO(apt.appointmentDate.toString()), date) && 
+        format(parseISO(apt.appointmentDate.toString()), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
       );
     };
 
@@ -404,7 +447,7 @@ export default function AppointmentsPage() {
                     onClick={() => setSelectedAppointment(apt)}
                   >
                     <div className="font-medium truncate">
-                      {format(parseISO(apt.appointmentDate), "HH:mm")}
+                      {format(parseISO(apt.appointmentDate.toString()), "HH:mm")}
                     </div>
                     <div className="truncate text-muted-foreground">
                       {apt.patientName}
@@ -436,8 +479,8 @@ export default function AppointmentsPage() {
   const TodayView = () => {
     const todayFormatted = format(new Date(), "yyyy-MM-dd");
     const todayAppointmentsList = Array.isArray(appointments) ? appointments.filter((apt: AppointmentWithDetails) =>
-      format(parseISO(apt.appointmentDate), 'yyyy-MM-dd') === todayFormatted
-    ).sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()) : [];
+      format(parseISO(apt.appointmentDate.toString()), 'yyyy-MM-dd') === todayFormatted
+    ).sort((a, b) => new Date(a.appointmentDate.toString()).getTime() - new Date(b.appointmentDate.toString()).getTime()) : [];
 
     return (
       <div className="printable-today bg-white dark:bg-gray-900 p-8">
@@ -735,7 +778,7 @@ export default function AppointmentsPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">{isArabic ? "أي طبيب متاح" : "Any available doctor"}</SelectItem>
+                            <SelectItem value="any">{isArabic ? "أي طبيب متاح" : "Any available doctor"}</SelectItem>
                             {doctors.map((doctor: UserType) => (
                               <SelectItem key={doctor.id} value={doctor.id}>
                                 {doctor.fullName}
@@ -886,7 +929,7 @@ export default function AppointmentsPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  <span>{format(parseISO(selectedAppointment.appointmentDate), "PPp", { locale: isArabic ? ar : undefined })}</span>
+                  <span>{format(parseISO(selectedAppointment.appointmentDate.toString()), "PPp", { locale: isArabic ? ar : undefined })}</span>
                 </div>
                 {selectedAppointment.doctorName && (
                   <div className="flex items-center gap-2">
