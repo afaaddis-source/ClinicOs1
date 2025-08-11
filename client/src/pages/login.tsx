@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-auth";
-import { useLanguage } from "@/components/language-provider";
+import { useLanguage, LanguageToggle } from "@/components/language-provider";
 import { LogIn, Loader2, Languages, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,7 +23,7 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { language, t, isRTL, toggleLanguage } = useLanguage();
+  const { language, t, isRTL } = useLanguage();
   const { toast } = useToast();
   const { user } = useUser();
   const [, navigate] = useLocation();
@@ -115,24 +115,16 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="flex justify-between items-center mb-8">
-          <div className="text-center w-full">
-            <h1 className="text-3xl font-bold text-primary mb-2">
-              {isArabic ? 'عيادة أوس' : 'ClinicOS'}
-            </h1>
-            <p className="text-muted-foreground">
-              {isArabic ? 'نظام إدارة العيادات' : 'Clinic Management System'}
-            </p>
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-primary mb-2">
+            {isArabic ? 'عيادة أوس' : 'ClinicOS'}
+          </h1>
+          <p className="text-muted-foreground">
+            {isArabic ? 'نظام إدارة العيادات' : 'Clinic Management System'}
+          </p>
+          <div className="mt-4 flex justify-center">
+            <LanguageToggle />
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleLanguage}
-            className="ml-2"
-            data-testid="button-language-toggle"
-          >
-            <Languages className="h-4 w-4" />
-          </Button>
         </div>
 
         <Card>
@@ -158,9 +150,9 @@ export default function LoginPage() {
                   </p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>admin/admin123</div>
-                    <div>doctor/doctor123</div>
-                    <div>reception/reception123</div>
-                    <div>accountant/accountant123</div>
+                    <div>dr.smith/admin123</div>
+                    <div>reception/admin123</div>
+                    <div>accountant/admin123</div>
                   </div>
                 </div>
               </AlertDescription>
