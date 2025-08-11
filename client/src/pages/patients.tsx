@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,25 +7,46 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye } from "lucide-react";
+import { Plus, Search, Eye, Loader2 } from "lucide-react";
 import { PatientForm } from "@/components/patient-form";
 import { apiRequest } from "@/lib/queryClient";
+import { useLanguage } from "@/components/language-provider";
 import type { Patient } from "@shared/schema";
 
 export default function PatientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const { language, t } = useLanguage();
+  const queryClient = useQueryClient();
+  const isArabic = language === 'ar';
 
-  const { data: patients = [], isLoading } = useQuery({
-    queryKey: ["/api/patients", searchTerm],
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data: patients = [], isLoading, error } = useQuery({
+    queryKey: ["/api/patients", debouncedSearchTerm],
     queryFn: async () => {
-      const url = searchTerm 
-        ? `/api/patients?search=${encodeURIComponent(searchTerm)}`
+      const url = debouncedSearchTerm.trim()
+        ? `/api/patients?search=${encodeURIComponent(debouncedSearchTerm.trim())}`
         : "/api/patients";
       const response = await apiRequest(url);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch patients');
+      }
+      
       const data = await response.json();
+      console.log('Search results for "' + debouncedSearchTerm + '":', data);
       return Array.isArray(data) ? data : [];
     },
+    staleTime: 30000, // 30 seconds
   });
 
   const formatDate = (dateString: string) => {
@@ -38,10 +59,10 @@ export default function PatientsPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold mb-2" data-testid="text-patients-title">
-            Patients
+            {isArabic ? 'المرضى' : 'Patients'}
           </h1>
           <p className="text-muted-foreground">
-            Manage patient records and information
+            {isArabic ? 'إدارة سجلات ومعلومات المرضى' : 'Manage patient records and information'}
           </p>
         </div>
         
@@ -49,12 +70,12 @@ export default function PatientsPage() {
           <DialogTrigger asChild>
             <Button data-testid="button-add-patient">
               <Plus className="mr-2 h-4 w-4" />
-              Add Patient
+              {isArabic ? 'إضافة مريض' : 'Add Patient'}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Add New Patient</DialogTitle>
+              <DialogTitle>{isArabic ? 'إضافة مريض جديد' : 'Add New Patient'}</DialogTitle>
             </DialogHeader>
             <PatientForm onSuccess={() => setIsCreateOpen(false)} onCancel={() => setIsCreateOpen(false)} />
           </DialogContent>
@@ -64,16 +85,20 @@ export default function PatientsPage() {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Patient List</CardTitle>
+            <CardTitle>{isArabic ? 'قائمة المرضى' : 'Patient List'}</CardTitle>
             <div className="flex items-center space-x-2">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search patients..."
+                placeholder={isArabic ? 'البحث في المرضى...' : 'Search patients...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-64"
                 data-testid="input-search"
+                dir={isArabic ? 'rtl' : 'ltr'}
               />
+              {searchTerm !== debouncedSearchTerm && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </div>
           </div>
         </CardHeader>
@@ -82,17 +107,28 @@ export default function PatientsPage() {
             <div className="flex justify-center p-8">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
+          ) : error ? (
+            <div className="flex justify-center p-8 text-red-500">
+              {isArabic ? 'خطأ في تحميل المرضى' : 'Error loading patients'}
+            </div>
+          ) : patients.length === 0 ? (
+            <div className="flex justify-center p-8 text-muted-foreground">
+              {debouncedSearchTerm 
+                ? (isArabic ? 'لا توجد نتائج للبحث' : 'No search results found')
+                : (isArabic ? 'لا يوجد مرضى' : 'No patients found')
+              }
+            </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Civil ID</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Date of Birth</TableHead>
-                  <TableHead>Gender</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>{isArabic ? 'الاسم' : 'Name'}</TableHead>
+                  <TableHead>{isArabic ? 'الرقم المدني' : 'Civil ID'}</TableHead>
+                  <TableHead>{isArabic ? 'الهاتف' : 'Phone'}</TableHead>
+                  <TableHead>{isArabic ? 'تاريخ الميلاد' : 'Date of Birth'}</TableHead>
+                  <TableHead>{isArabic ? 'الجنس' : 'Gender'}</TableHead>
+                  <TableHead>{isArabic ? 'الحالة' : 'Status'}</TableHead>
+                  <TableHead>{isArabic ? 'الإجراءات' : 'Actions'}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -115,14 +151,17 @@ export default function PatientsPage() {
                     </TableCell>
                     <TableCell data-testid={`patient-status-${patient.id}`}>
                       <Badge variant={patient.isActive ? "default" : "secondary"}>
-                        {patient.isActive ? "Active" : "Inactive"}
+                        {patient.isActive 
+                          ? (isArabic ? "نشط" : "Active") 
+                          : (isArabic ? "غير نشط" : "Inactive")
+                        }
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Link href={`/patients/${patient.id}`}>
                         <Button size="sm" variant="outline" data-testid={`button-view-${patient.id}`}>
                           <Eye className="h-4 w-4 mr-2" />
-                          View
+                          {isArabic ? 'عرض' : 'View'}
                         </Button>
                       </Link>
                     </TableCell>
