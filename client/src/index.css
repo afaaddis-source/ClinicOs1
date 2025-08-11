@@ -1,9 +1,9 @@
+/* Arabic Font */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Arabic Font */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
   /* Arabic-first font family */
@@ -271,6 +271,138 @@
 /* Loading states */
 .loading-spinner {
   animation: spin 1s linear infinite;
+}
+
+/* Language switching transitions */
+html {
+  transition: font-family 0.3s ease, direction 0.3s ease;
+}
+
+body {
+  transition: font-family 0.3s ease;
+}
+
+/* Arabic language specific styles */
+.lang-ar {
+  font-family: var(--font-arabic);
+}
+
+.lang-ar body,
+.lang-ar * {
+  font-family: var(--font-arabic) !important;
+}
+
+/* English language specific styles */
+.lang-en {
+  font-family: var(--font-english);
+}
+
+.lang-en body,
+.lang-en * {
+  font-family: var(--font-english) !important;
+}
+
+/* Sidebar styles */
+.sidebar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1.5rem;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.25rem;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  gap: 0.75rem;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: translateX(2px);
+}
+
+[dir="rtl"] .nav-link:hover {
+  transform: translateX(-2px);
+}
+
+.nav-link.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-weight: 600;
+}
+
+/* Language toggle button */
+.language-toggle-btn {
+  transition: all 0.2s ease !important;
+}
+
+.language-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* RTL specific adjustments */
+[dir="rtl"] .sidebar {
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+[dir="rtl"] .nav-link {
+  text-align: right;
+}
+
+/* Ensure proper text direction for Arabic numbers */
+.lang-ar .tabular-nums {
+  font-feature-settings: "tnum" 1;
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+/* Form styling improvements for RTL */
+[dir="rtl"] .form-control {
+  text-align: right;
+}
+
+[dir="rtl"] .form-label {
+  text-align: right;
+}
+
+/* Button improvements */
+[dir="rtl"] .btn {
+  text-align: center;
+}
+
+/* Table improvements for RTL */
+[dir="rtl"] .table {
+  text-align: right;
+}
+
+[dir="rtl"] .table th:first-child,
+[dir="rtl"] .table td:first-child {
+  text-align: right;
+}
+
+/* Animation for smooth language transitions */
+@keyframes fadeInOut {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+.lang-switching {
+  animation: fadeInOut 0.3s ease-in-out;
 }
 
 @keyframes spin {

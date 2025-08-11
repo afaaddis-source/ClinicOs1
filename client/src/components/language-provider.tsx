@@ -43,6 +43,9 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     const direction = getDirection(language);
     const htmlElement = document.documentElement;
     
+    // Add transition class for smooth switching
+    htmlElement.classList.add('lang-switching');
+    
     // Update HTML attributes
     htmlElement.setAttribute('lang', language);
     htmlElement.setAttribute('dir', direction);
@@ -54,19 +57,15 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     // Save to localStorage
     localStorage.setItem('clinic-language', language);
     
-    // Load appropriate CSS theme file if needed
-    const existingTheme = document.querySelector('link[data-theme]');
-    if (existingTheme) {
-      existingTheme.remove();
-    }
+    // Update body font-family directly for immediate effect
+    document.body.style.fontFamily = language === 'ar' ? 'var(--font-arabic)' : 'var(--font-english)';
     
-    const themeLink = document.createElement('link');
-    themeLink.rel = 'stylesheet';
-    themeLink.href = '/css/theme.css';
-    themeLink.setAttribute('data-theme', 'clinic');
-    document.head.appendChild(themeLink);
+    // Remove transition class after animation
+    setTimeout(() => {
+      htmlElement.classList.remove('lang-switching');
+    }, 300);
 
-  }, [language]);
+  }, [language, isLoaded]);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
