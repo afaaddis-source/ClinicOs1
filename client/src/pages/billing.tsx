@@ -132,12 +132,12 @@ export default function BillingPage() {
   });
 
   // Queries
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
+  const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery({
     queryKey: ["/api/invoices", statusFilter],
     queryFn: () => apiRequest(`/api/invoices${statusFilter !== "ALL" ? `?status=${statusFilter}` : ""}`),
   });
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+  const { data: paymentsData, isLoading: paymentsLoading, error: paymentsError } = useQuery({
     queryKey: ["/api/payments", dateRange],
     queryFn: () => apiRequest(`/api/payments?from=${dateRange.from.toISOString()}&to=${dateRange.to.toISOString()}`),
   });
@@ -156,6 +156,10 @@ export default function BillingPage() {
     queryKey: ["/api/visits"],
     queryFn: () => apiRequest("/api/visits"),
   });
+
+  // Ensure data is arrays
+  const invoices = Array.isArray(invoicesData) ? invoicesData : [];
+  const payments = Array.isArray(paymentsData) ? paymentsData : [];
 
   // Mutations
   const createInvoiceMutation = useMutation({
@@ -285,15 +289,15 @@ export default function BillingPage() {
   const exportInvoicesCSV = () => {
     const csvContent = [
       ["Invoice Number", "Patient", "Date", "Subtotal", "Discount", "Tax", "Total", "Status"].join(","),
-      ...invoices.map((invoice: InvoiceWithDetails) => [
-        invoice.invoiceNumber,
+      ...invoices.map((invoice: any) => [
+        invoice.invoiceNumber || "",
         invoice.patientName || "",
         format(new Date(invoice.issueDate), "yyyy-MM-dd"),
-        invoice.subtotalAmount.toFixed(3),
-        invoice.discountAmount.toFixed(3),
-        invoice.taxAmount.toFixed(3),
-        invoice.totalAmount.toFixed(3),
-        invoice.status
+        parseFloat(invoice.subtotalAmount || invoice.subtotal || 0).toFixed(3),
+        parseFloat(invoice.discountAmount || 0).toFixed(3),
+        parseFloat(invoice.taxAmount || 0).toFixed(3),
+        parseFloat(invoice.totalAmount || 0).toFixed(3),
+        invoice.status || invoice.paymentStatus || "PENDING"
       ].join(","))
     ].join("\n");
 
@@ -308,13 +312,13 @@ export default function BillingPage() {
   const exportPaymentsCSV = () => {
     const csvContent = [
       ["Date", "Invoice", "Patient", "Amount", "Method", "Reference", "Received By"].join(","),
-      ...payments.map((payment: Payment) => [
-        format(new Date(payment.paidAt), "yyyy-MM-dd HH:mm"),
+      ...payments.map((payment: any) => [
+        format(new Date(payment.paidAt || payment.paymentDate), "yyyy-MM-dd HH:mm"),
         payment.invoiceNumber || "",
         payment.patientName || "",
-        payment.amount.toFixed(3),
-        payment.method,
-        payment.transactionReference || "",
+        parseFloat(payment.amount || 0).toFixed(3),
+        payment.method || payment.paymentMethod || "",
+        payment.transactionReference || payment.transactionId || "",
         payment.receivedByName || ""
       ].join(","))
     ].join("\n");
@@ -727,18 +731,18 @@ export default function BillingPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.map((invoice: InvoiceWithDetails) => (
+                  {invoices.map((invoice: any) => (
                     <TableRow key={invoice.id}>
                       <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                       <TableCell>{invoice.patientName}</TableCell>
                       <TableCell>{format(new Date(invoice.issueDate), "PPp", { locale: isArabic ? ar : undefined })}</TableCell>
-                      <TableCell>{invoice.totalAmount.toFixed(3)} KWD</TableCell>
+                      <TableCell>{parseFloat(invoice.totalAmount || 0).toFixed(3)} KWD</TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(invoice.status)}>
+                        <Badge className={getStatusColor(invoice.status || invoice.paymentStatus)}>
                           {isArabic ? (
-                            invoice.status === "PAID" ? "مدفوع" :
-                            invoice.status === "PARTIAL" ? "جزئي" : "غير مدفوع"
-                          ) : invoice.status}
+                            (invoice.status || invoice.paymentStatus) === "PAID" ? "مدفوع" :
+                            (invoice.status || invoice.paymentStatus) === "PARTIAL" ? "جزئي" : "غير مدفوع"
+                          ) : (invoice.status || invoice.paymentStatus)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -756,7 +760,7 @@ export default function BillingPage() {
                               <Eye className="h-4 w-4 mr-2" />
                               {isArabic ? "عرض" : "View"}
                             </DropdownMenuItem>
-                            {invoice.status !== "PAID" && (
+                            {(invoice.status || invoice.paymentStatus) !== "PAID" && (
                               <DropdownMenuItem onClick={() => {
                                 setSelectedInvoice(invoice);
                                 paymentForm.setValue("invoiceId", invoice.id);
@@ -846,21 +850,21 @@ export default function BillingPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payments.map((payment: Payment) => {
-                    const PaymentIcon = getPaymentMethodIcon(payment.method);
+                  {payments.map((payment: any) => {
+                    const PaymentIcon = getPaymentMethodIcon(payment.method || payment.paymentMethod);
                     return (
                       <TableRow key={payment.id}>
-                        <TableCell>{format(new Date(payment.paidAt), "PPp", { locale: isArabic ? ar : undefined })}</TableCell>
-                        <TableCell>{payment.invoiceNumber}</TableCell>
-                        <TableCell>{payment.patientName}</TableCell>
-                        <TableCell>{payment.amount.toFixed(3)} KWD</TableCell>
+                        <TableCell>{format(new Date(payment.paidAt || payment.paymentDate), "PPp", { locale: isArabic ? ar : undefined })}</TableCell>
+                        <TableCell>{payment.invoiceNumber || "-"}</TableCell>
+                        <TableCell>{payment.patientName || "-"}</TableCell>
+                        <TableCell>{parseFloat(payment.amount || 0).toFixed(3)} KWD</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <PaymentIcon className="h-4 w-4" />
-                            {payment.method}
+                            {payment.method || payment.paymentMethod}
                           </div>
                         </TableCell>
-                        <TableCell>{payment.transactionReference || "-"}</TableCell>
+                        <TableCell>{payment.transactionReference || payment.transactionId || "-"}</TableCell>
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -902,7 +906,7 @@ export default function BillingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {invoices.reduce((sum: number, inv: InvoiceWithDetails) => sum + inv.totalAmount, 0).toFixed(3)} KWD
+                  {invoices.reduce((sum: number, inv: any) => sum + parseFloat(inv.totalAmount || 0), 0).toFixed(3)} KWD
                 </div>
               </CardContent>
             </Card>
@@ -913,7 +917,7 @@ export default function BillingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {payments.reduce((sum: number, pay: Payment) => sum + pay.amount, 0).toFixed(3)} KWD
+                  {payments.reduce((sum: number, pay: any) => sum + parseFloat(pay.amount || 0), 0).toFixed(3)} KWD
                 </div>
               </CardContent>
             </Card>
@@ -924,7 +928,7 @@ export default function BillingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {invoices.filter((inv: InvoiceWithDetails) => inv.status !== "PAID").length}
+                  {invoices.filter((inv: any) => (inv.status || inv.paymentStatus) !== "PAID").length}
                 </div>
               </CardContent>
             </Card>
