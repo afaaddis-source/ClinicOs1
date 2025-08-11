@@ -1,4 +1,3 @@
-import { useContext } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,45 +9,44 @@ import {
   CreditCard, 
   Settings, 
   LogOut,
-  Languages
+  Globe
 } from "lucide-react";
-import { LanguageContext } from "@/App";
 import { useUser, useLogout } from "@/hooks/use-auth";
+import { useLanguage, LanguageToggle } from "@/components/language-provider";
 
 export default function Sidebar() {
   const [location] = useLocation();
-  const { language, setLanguage } = useContext(LanguageContext);
+  const { t, language, isRTL } = useLanguage();
   const { user } = useUser();
   const logout = useLogout();
-  const isArabic = language === 'ar';
 
   const navigation = [
     {
-      name: isArabic ? 'لوحة التحكم' : 'Dashboard',
+      name: t('nav.dashboard'),
       href: '/dashboard',
       icon: LayoutDashboard,
       current: location === '/' || location === '/dashboard',
     },
     {
-      name: isArabic ? 'المرضى' : 'Patients',
+      name: t('nav.patients'),
       href: '/patients',
       icon: Users,
       current: location === '/patients',
     },
     {
-      name: isArabic ? 'المواعيد' : 'Appointments',
+      name: t('nav.appointments'),
       href: '/appointments',
       icon: Calendar,
       current: location === '/appointments',
     },
     {
-      name: isArabic ? 'الزيارات' : 'Visits',
+      name: t('nav.visits'),
       href: '/visits',
       icon: Stethoscope,
       current: location === '/visits',
     },
     {
-      name: isArabic ? 'الفواتير' : 'Billing',
+      name: t('nav.billing'),
       href: '/billing',
       icon: CreditCard,
       current: location === '/billing',
@@ -58,40 +56,40 @@ export default function Sidebar() {
   // Add admin section for admin users
   if (user?.role === 'ADMIN') {
     navigation.push({
-      name: isArabic ? 'الإدارة' : 'Administration',
+      name: t('nav.admin'),
       href: '/admin',
       icon: Settings,
       current: location === '/admin',
     });
   }
 
-  const toggleLanguage = () => {
-    setLanguage(language === 'ar' ? 'en' : 'ar');
-  };
-
   const handleLogout = () => {
     logout.mutate();
   };
 
+  const userRoleTranslation = user?.role ? t(`roles.${user.role.toLowerCase()}`) : '';
+
   return (
-    <div className="flex h-screen w-64 flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700" data-testid="sidebar">
-      <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
+    <div className="sidebar flex h-screen w-64 flex-col" data-testid="sidebar">
+      {/* Header */}
+      <div className="navbar-brand">
         <div className="flex items-center">
           <div className="flex-shrink-0">
-            <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-              <Stethoscope className="h-5 w-5 text-primary-foreground" />
+            <div className="h-8 w-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+              <Stethoscope className="h-5 w-5 text-white" />
             </div>
           </div>
-          <div className="ml-3">
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {isArabic ? 'عيادة أوس' : 'ClinicOS'}
+          <div className={cn("flex-1", isRTL ? "mr-3" : "ml-3")}>
+            <h1 className="text-xl font-bold text-white">
+              {t('app.name')}
             </h1>
           </div>
         </div>
       </div>
 
+      {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
-        <nav className="mt-5 space-y-1 px-2">
+        <nav className="space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
@@ -99,74 +97,53 @@ export default function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  item.current
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white',
-                  'group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                  "nav-link",
+                  item.current && "active"
                 )}
                 data-testid={`link-${item.href.slice(1)}`}
               >
-                <Icon
-                  className={cn(
-                    item.current
-                      ? 'text-primary-foreground'
-                      : 'text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300',
-                    'mr-3 flex-shrink-0 h-5 w-5'
-                  )}
-                />
-                {item.name}
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                <span>{item.name}</span>
               </Link>
             );
           })}
         </nav>
       </div>
 
-      <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <div className="h-8 w-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {user?.fullName?.charAt(0) || user?.username?.charAt(0) || 'U'}
-              </span>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300" data-testid="text-user-name">
-                {user?.fullName || user?.username}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {user?.role === 'ADMIN' ? (isArabic ? 'مدير' : 'Admin') :
-                 user?.role === 'DOCTOR' ? (isArabic ? 'طبيب' : 'Doctor') :
-                 user?.role === 'RECEPTION' ? (isArabic ? 'استقبال' : 'Reception') :
-                 user?.role === 'ACCOUNTANT' ? (isArabic ? 'محاسب' : 'Accountant') :
-                 user?.role}
-              </p>
-            </div>
+      {/* User Profile & Controls */}
+      <div className="border-t border-white border-opacity-10 p-4 space-y-4">
+        {/* User Info */}
+        <div className="flex items-center space-x-3 rtl:space-x-reverse">
+          <div className="h-10 w-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+            <span className="text-sm font-medium text-white">
+              {user?.fullName?.charAt(0) || user?.username?.charAt(0) || 'U'}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate" data-testid="text-user-name">
+              {user?.fullName || user?.username}
+            </p>
+            <p className="text-xs text-white text-opacity-70 truncate">
+              {userRoleTranslation}
+            </p>
           </div>
         </div>
         
-        <div className="flex space-x-2 rtl:space-x-reverse">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleLanguage}
-            className="flex-1"
-            data-testid="button-language-toggle"
-          >
-            <Languages className="h-4 w-4 mr-2" />
-            {isArabic ? 'EN' : 'عر'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="flex-1"
-            disabled={logout.isPending}
-            data-testid="button-logout"
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            {isArabic ? 'خروج' : 'Logout'}
-          </Button>
+        {/* Language Toggle */}
+        <div className="language-toggle">
+          <LanguageToggle />
         </div>
+
+        {/* Logout Button */}
+        <Button
+          variant="ghost"
+          onClick={handleLogout}
+          className="w-full justify-start text-white hover:bg-white hover:bg-opacity-10 hover:text-white border-white border-opacity-20"
+          data-testid="button-logout"
+        >
+          <LogOut className={cn("h-4 w-4", isRTL ? "ml-2" : "mr-2")} />
+          {t('nav.logout')}
+        </Button>
       </div>
     </div>
   );

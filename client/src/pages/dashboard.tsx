@@ -16,7 +16,7 @@ import {
   Play,
   Plus
 } from "lucide-react";
-import { LanguageContext } from "@/App";
+import { useLanguage } from "@/components/language-provider";
 import { useUser } from "@/hooks/use-auth";
 
 interface DashboardStats {
@@ -29,7 +29,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { language } = useContext(LanguageContext);
+  const { language, t, isRTL } = useLanguage();
   const { user } = useUser();
   const isArabic = language === 'ar';
 

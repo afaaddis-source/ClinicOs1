@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { LanguageContext } from "@/App";
+import { useLanguage } from "@/components/language-provider";
 import { useUser } from "@/hooks/use-auth";
 import { 
   Plus, 
@@ -109,7 +109,7 @@ interface ClinicInfo {
 }
 
 export default function AdminPage() {
-  const { language } = useContext(LanguageContext);
+  const { language, t, isRTL } = useLanguage();
   const { user: currentUser } = useUser();
   const { toast } = useToast();
   const isArabic = language === 'ar';

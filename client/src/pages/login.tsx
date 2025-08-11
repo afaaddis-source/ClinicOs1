@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-auth";
-import { LanguageContext } from "@/App";
+import { useLanguage } from "@/components/language-provider";
 import { LogIn, Loader2, Languages, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,7 +23,7 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { language, setLanguage } = useContext(LanguageContext);
+  const { language, t, isRTL, toggleLanguage } = useLanguage();
   const { toast } = useToast();
   const { user } = useUser();
   const [, navigate] = useLocation();
@@ -106,9 +106,7 @@ export default function LoginPage() {
     loginMutation.mutate(data);
   };
 
-  const toggleLanguage = () => {
-    setLanguage(language === 'ar' ? 'en' : 'ar');
-  };
+
 
   if (user) {
     return null; // Will redirect
