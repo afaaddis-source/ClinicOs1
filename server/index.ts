@@ -44,24 +44,42 @@ app.use(session({
   },
 }));
 
-// CSRF protection - temporarily disabled for development
-// app.use((req, res, next) => {
-//   // Skip CSRF for GET requests and login endpoint
-//   if (req.method === "GET" || req.path === "/api/auth/login") {
-//     return next();
-//   }
-//   
-//   // Apply CSRF protection for other routes
-//   const csrfProtection = csrf({
-//     cookie: {
-//       httpOnly: true,
-//       secure: process.env.NODE_ENV === "production",
-//       sameSite: "strict",
-//     },
-//   });
-//   
-//   return csrfProtection(req, res, next);
-// });
+// CSRF protection with friendly error handling
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  },
+});
+
+app.use((req, res, next) => {
+  // Skip CSRF for GET requests, preflight OPTIONS, and login endpoint
+  if (req.method === "GET" || req.method === "OPTIONS" || req.path === "/api/auth/login") {
+    return next();
+  }
+  
+  // Apply CSRF protection for state-changing requests
+  return csrfProtection(req, res, (err) => {
+    if (err) {
+      // Return friendly CSRF error message
+      return res.status(403).json({
+        error: "CSRF_ERROR",
+        message: "Your session has expired for security reasons. Please refresh the page and try again.",
+        code: "EBADCSRFTOKEN"
+      });
+    }
+    next();
+  });
+});
+
+// Serve localization files
+app.use('/locales', express.static('locales'));
+
+// CSRF token endpoint
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: req.csrfToken?.() || 'test-token' });
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

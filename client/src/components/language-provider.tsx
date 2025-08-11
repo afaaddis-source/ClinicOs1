@@ -114,7 +114,11 @@ export const useLanguage = () => {
 
 // Language Toggle Component
 export const LanguageToggle: React.FC = () => {
-  const { language, toggleLanguage, t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
+  
+  const toggleLanguage = () => {
+    setLanguage(language === 'ar' ? 'en' : 'ar');
+  };
 
   return (
     <button

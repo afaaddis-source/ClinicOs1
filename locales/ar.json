@@ -289,6 +289,14 @@
     "other": "أخرى"
   },
   "currency": "د.ك",
+  "fields": {
+    "first_name": "الاسم الأول",
+    "last_name": "اسم العائلة",
+    "email": "البريد الإلكتروني",
+    "phone": "رقم الهاتف",
+    "password": "كلمة المرور",
+    "username": "اسم المستخدم"
+  },
   "common": {
     "save": "حفظ",
     "cancel": "إلغاء",
@@ -342,12 +350,13 @@
   },
   "validation": {
     "required": "هذا الحقل مطلوب",
+    "required_field": "حقل {field} مطلوب",
     "invalid_input": "البيانات المدخلة غير صحيحة",
     "invalid_email": "عنوان البريد الإلكتروني غير صحيح",
     "invalid_phone": "رقم الهاتف غير صحيح",
     "invalid_date": "التاريخ غير صحيح",
-    "min_length": "يجب أن يكون الطول على الأقل {min} أحرف",
-    "max_length": "يجب أن لا يتجاوز الطول {max} حرف",
+    "min_length": "يجب أن يكون {field} أكثر من 3 أحرف",
+    "max_length": "يجب أن يكون {field} أقل من 255 حرفاً",
     "min_value": "القيمة يجب أن تكون على الأقل {min}",
     "max_value": "القيمة يجب أن لا تتجاوز {max}",
     "invalid_format": "التنسيق غير صحيح",
@@ -369,7 +378,14 @@
     "update_failed": "فشل في التحديث",
     "delete_failed": "فشل في الحذف",
     "create_failed": "فشل في الإنشاء",
-    "generic_error": "حدث خطأ غير متوقع"
+    "generic_error": "حدث خطأ غير متوقع",
+    "something_went_wrong": "حدث خطأ غير متوقع",
+    "chunk_load_error": "فشل في تحميل جزء من التطبيق. يرجى إعادة تحميل الصفحة.",
+    "type_error": "خطأ في النوع. يرجى المحاولة مرة أخرى.",
+    "technical_details": "التفاصيل التقنية",
+    "auto_recovery_message": "سيتم إعادة المحاولة تلقائياً خلال 10 ثواني...",
+    "not_found_message_detailed": "المورد المطلوب غير موجود.",
+    "form_errors_title": "يرجى تصحيح الأخطاء التالية:"
   },
   "messages": {
     "delete_confirm": "هل أنت متأكد من الحذف؟",
