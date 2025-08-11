@@ -518,7 +518,7 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getInvoicesByStatus(status: string): Promise<Invoice[]> {
-    return await db.select().from(invoices).where(eq(invoices.paymentStatus, status)).orderBy(desc(invoices.issueDate));
+    return await db.select().from(invoices).where(eq(invoices.paymentStatus, status as any)).orderBy(desc(invoices.issueDate));
   }
 
   async getAllInvoicesWithDetails(): Promise<any[]> {
