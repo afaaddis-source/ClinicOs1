@@ -137,20 +137,25 @@ export default function AppointmentsPage() {
     queryFn: () => apiRequest("/api/appointments/today"),
   });
 
-  const { data: patients = [] } = useQuery({
+  const { data: patientsData } = useQuery({
     queryKey: ["/api/patients"],
     queryFn: () => apiRequest("/api/patients"),
   });
 
-  const { data: services = [] } = useQuery({
+  const { data: servicesData } = useQuery({
     queryKey: ["/api/services"],
     queryFn: () => apiRequest("/api/services"),
   });
 
-  const { data: doctors = [] } = useQuery({
+  const { data: doctorsData } = useQuery({
     queryKey: ["/api/doctors"],
     queryFn: () => apiRequest("/api/doctors"),
   });
+
+  // Ensure data is arrays
+  const patients = Array.isArray(patientsData) ? patientsData : [];
+  const services = Array.isArray(servicesData) ? servicesData : [];
+  const doctors = Array.isArray(doctorsData) ? doctorsData : [];
 
   const { data: availableSlots = [] } = useQuery({
     queryKey: ["/api/appointments/available-slots", selectedDate],
