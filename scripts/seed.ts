@@ -83,6 +83,7 @@ async function seed() {
     console.log("🦷 Creating services...");
     const createdServices = await db.insert(services).values([
       {
+        code: "EXAM001",
         nameAr: "فحص عام",
         nameEn: "General Checkup",
         descriptionAr: "فحص شامل للأسنان واللثة",
@@ -93,6 +94,7 @@ async function seed() {
         isActive: true,
       },
       {
+        code: "CLEAN001",
         nameAr: "تنظيف الأسنان",
         nameEn: "Teeth Cleaning",
         descriptionAr: "تنظيف وتلميع الأسنان",
@@ -103,6 +105,7 @@ async function seed() {
         isActive: true,
       },
       {
+        code: "FILL001",
         nameAr: "حشو الأسنان",
         nameEn: "Dental Filling",
         descriptionAr: "حشو الأسنان المسوسة",
@@ -113,6 +116,7 @@ async function seed() {
         isActive: true,
       },
       {
+        code: "EXTR001",
         nameAr: "قلع الأسنان",
         nameEn: "Tooth Extraction",
         descriptionAr: "قلع الأسنان التالفة",
@@ -123,6 +127,7 @@ async function seed() {
         isActive: true,
       },
       {
+        code: "ORTH001",
         nameAr: "تقويم الأسنان",
         nameEn: "Orthodontics",
         descriptionAr: "تركيب وتعديل تقويم الأسنان",
