@@ -672,7 +672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check for appointment conflicts
       const hasConflict = await storage.checkAppointmentConflict(
         new Date(appointmentData.appointmentDate),
-        appointmentData.duration,
+        appointmentData.duration || 30,
         appointmentData.doctorId
       );
 
