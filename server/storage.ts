@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, and, like, desc, sql } from "drizzle-orm";
+import { eq, and, like, desc, gte, lte, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import {
   users,
@@ -517,6 +517,81 @@ export class PostgreSQLStorage implements IStorage {
     return await db.select().from(invoices).where(sql`${invoices.totalAmount} > ${invoices.paidAmount}`).orderBy(desc(invoices.issueDate));
   }
 
+  async getInvoicesByStatus(status: string): Promise<Invoice[]> {
+    return await db.select().from(invoices).where(eq(invoices.paymentStatus, status)).orderBy(desc(invoices.issueDate));
+  }
+
+  async getAllInvoicesWithDetails(): Promise<any[]> {
+    return await db.select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      patientId: invoices.patientId,
+      visitId: invoices.visitId,
+      issueDate: invoices.issueDate,
+      dueDate: invoices.dueDate,
+      subtotalAmount: invoices.subtotal,
+      discountAmount: invoices.discountAmount,
+      taxAmount: invoices.taxAmount,
+      totalAmount: invoices.totalAmount,
+      paidAmount: invoices.paidAmount,
+      status: invoices.paymentStatus,
+      notes: invoices.notes,
+      createdBy: invoices.createdBy,
+      createdAt: invoices.createdAt,
+      updatedAt: invoices.updatedAt,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      remainingAmount: sql<number>`${invoices.totalAmount} - ${invoices.paidAmount}`,
+    })
+    .from(invoices)
+    .leftJoin(patients, eq(invoices.patientId, patients.id))
+    .orderBy(desc(invoices.issueDate));
+  }
+
+  async createInvoiceWithItems(invoiceData: any, items: any[]): Promise<Invoice> {
+    // Start transaction
+    const result = await db.transaction(async (tx) => {
+      // Create invoice
+      const [invoice] = await tx.insert(invoices).values(invoiceData).returning();
+      
+      // Create invoice items
+      for (const item of items) {
+        await tx.insert(invoiceItems).values({
+          ...item,
+          invoiceId: invoice.id,
+        });
+      }
+      
+      return invoice;
+    });
+    
+    return result;
+  }
+
+  async updateInvoicePaymentStatus(invoiceId: string, paymentAmount: number): Promise<void> {
+    const invoice = await this.getInvoice(invoiceId);
+    if (!invoice) return;
+
+    const newPaidAmount = Number(invoice.paidAmount) + Number(paymentAmount);
+    const totalAmount = Number(invoice.totalAmount);
+    
+    let newStatus: string;
+    if (newPaidAmount >= totalAmount) {
+      newStatus = "PAID";
+    } else if (newPaidAmount > 0) {
+      newStatus = "PARTIAL";
+    } else {
+      newStatus = "UNPAID";
+    }
+
+    await db.update(invoices)
+      .set({ 
+        paidAmount: newPaidAmount.toString(),
+        paymentStatus: newStatus as any,
+        updatedAt: new Date() 
+      })
+      .where(eq(invoices.id, invoiceId));
+  }
+
   async getAppointmentWithDetails(id: string): Promise<any | undefined> {
     const result = await db.select({
       id: appointments.id,
@@ -591,6 +666,54 @@ export class PostgreSQLStorage implements IStorage {
 
   async getAllPayments(): Promise<Payment[]> {
     return await db.select().from(payments).orderBy(desc(payments.paymentDate));
+  }
+
+  async getAllPaymentsWithDetails(): Promise<any[]> {
+    return await db.select({
+      id: payments.id,
+      invoiceId: payments.invoiceId,
+      amount: payments.amount,
+      method: payments.paymentMethod,
+      transactionReference: payments.transactionId,
+      notes: payments.notes,
+      paidAt: payments.paymentDate,
+      receivedBy: payments.receivedBy,
+      createdAt: payments.createdAt,
+      invoiceNumber: invoices.invoiceNumber,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      receivedByName: users.fullName
+    })
+    .from(payments)
+    .leftJoin(invoices, eq(payments.invoiceId, invoices.id))
+    .leftJoin(patients, eq(invoices.patientId, patients.id))
+    .leftJoin(users, eq(payments.receivedBy, users.id))
+    .orderBy(desc(payments.paymentDate));
+  }
+
+  async getPaymentsByDateRange(fromDate: Date, toDate: Date): Promise<any[]> {
+    return await db.select({
+      id: payments.id,
+      invoiceId: payments.invoiceId,
+      amount: payments.amount,
+      method: payments.paymentMethod,
+      transactionReference: payments.transactionId,
+      notes: payments.notes,
+      paidAt: payments.paymentDate,
+      receivedBy: payments.receivedBy,
+      createdAt: payments.createdAt,
+      invoiceNumber: invoices.invoiceNumber,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      receivedByName: users.fullName
+    })
+    .from(payments)
+    .leftJoin(invoices, eq(payments.invoiceId, invoices.id))
+    .leftJoin(patients, eq(invoices.patientId, patients.id))
+    .leftJoin(users, eq(payments.receivedBy, users.id))
+    .where(and(
+      gte(payments.paymentDate, fromDate),
+      lte(payments.paymentDate, toDate)
+    ))
+    .orderBy(desc(payments.paymentDate));
   }
 
   // Audit logging

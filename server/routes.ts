@@ -930,13 +930,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get start of week (Saturday) and end of week (Friday)
       const startOfWeek = new Date(baseDate);
-      startOfWeek.setDate(baseDate.getDate() - baseDate.getDay() + 6); // Saturday
+      const dayOfWeek = baseDate.getDay();
+      // Adjust to Saturday (6) as start of week
+      const daysToSaturday = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
+      startOfWeek.setDate(baseDate.getDate() - daysToSaturday);
       startOfWeek.setHours(0, 0, 0, 0);
       
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6); // Friday
-      endOfWeek.setHours(23, 59, 59, 999);
-
       const appointments = await storage.getWeeklyAppointments(startOfWeek);
       res.json(appointments);
     } catch (error) {
@@ -1020,15 +1019,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Invoice management routes
   app.get("/api/invoices", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { patient, unpaid } = req.query;
+      const { patient, unpaid, status } = req.query;
       let invoices;
 
       if (patient && typeof patient === "string") {
         invoices = await storage.getInvoicesByPatient(patient);
       } else if (unpaid === "true") {
         invoices = await storage.getUnpaidInvoices();
+      } else if (status && status !== "ALL") {
+        invoices = await storage.getInvoicesByStatus(status as string);
       } else {
-        invoices = await storage.getAllInvoices();
+        invoices = await storage.getAllInvoicesWithDetails();
       }
       
       res.json(invoices);
@@ -1038,20 +1039,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/invoices", requireAuth, requireRole(["ACCOUNTANT", "ADMIN"]), async (req: Request, res: Response) => {
+  app.post("/api/invoices", requireAuth, requireRole(["ACCOUNTANT", "ADMIN", "RECEPTION"]), async (req: Request, res: Response) => {
     try {
-      const invoiceData = insertInvoiceSchema.parse({
-        ...req.body,
+      const { items, ...invoiceData } = req.body;
+      
+      // Generate unique invoice number
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = (now.getMonth() + 1).toString().padStart(2, "0");
+      const sequence = Math.floor(Math.random() * 9999).toString().padStart(4, "0");
+      const invoiceNumber = `INV-${year}${month}-${sequence}`;
+
+      // Calculate totals
+      const subtotal = items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0);
+      const discountAmount = invoiceData.discountType === "PERCENTAGE" 
+        ? subtotal * (invoiceData.discountValue / 100)
+        : invoiceData.discountValue || 0;
+      const taxAmount = (subtotal - discountAmount) * ((invoiceData.taxPercentage || 0) / 100);
+      const totalAmount = subtotal - discountAmount + taxAmount;
+
+      const completeInvoiceData = {
+        invoiceNumber,
+        patientId: invoiceData.patientId,
+        visitId: invoiceData.visitId || null,
+        issueDate: new Date(),
+        dueDate: invoiceData.dueDate ? new Date(invoiceData.dueDate) : null,
+        subtotal: subtotal.toString(),
+        taxAmount: taxAmount.toString(),
+        discountAmount: discountAmount.toString(),
+        totalAmount: totalAmount.toString(),
+        paidAmount: "0",
+        paymentStatus: "PENDING",
+        notes: invoiceData.notes || null,
         createdBy: req.session.user?.id,
-      });
-      const invoice = await storage.createInvoice(invoiceData);
+      };
+
+      const invoice = await storage.createInvoiceWithItems(completeInvoiceData, items);
       
       await storage.createAuditLog({
         userId: req.session.user?.id,
         action: "CREATE",
         tableName: "invoices",
         recordId: invoice.id,
-        newValues: invoiceData,
+        newValues: completeInvoiceData,
         ipAddress: req.ip,
         userAgent: req.get("User-Agent"),
       });
@@ -1067,26 +1097,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payment management routes
+  app.get("/api/payments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { from, to, invoice } = req.query;
+      let payments;
+
+      if (from && to) {
+        const fromDate = new Date(from as string);
+        const toDate = new Date(to as string);
+        payments = await storage.getPaymentsByDateRange(fromDate, toDate);
+      } else if (invoice) {
+        payments = await storage.getPaymentsByInvoice(invoice as string);
+      } else {
+        payments = await storage.getAllPaymentsWithDetails();
+      }
+      
+      res.json(payments);
+    } catch (error) {
+      console.error("Get payments error:", error);
+      res.status(500).json({ error: "Failed to fetch payments" });
+    }
+  });
+
   app.post("/api/payments", requireAuth, requireRole(["ACCOUNTANT", "RECEPTION", "ADMIN"]), async (req: Request, res: Response) => {
     try {
-      const paymentData = insertPaymentSchema.parse({
-        ...req.body,
+      const paymentData = {
+        invoiceId: req.body.invoiceId,
+        amount: req.body.amount.toString(),
+        paymentMethod: req.body.method || req.body.paymentMethod,
+        transactionId: req.body.transactionReference || req.body.transactionId,
+        paymentDate: new Date(),
+        notes: req.body.notes,
         receivedBy: req.session.user?.id,
-      });
+      };
+
       const payment = await storage.createPayment(paymentData);
       
-      // Update invoice paid amount
-      const invoice = await storage.getInvoice(paymentData.invoiceId);
-      if (invoice) {
-        const newPaidAmount = Number(invoice.paidAmount) + Number(paymentData.amount);
-        const newStatus = newPaidAmount >= Number(invoice.totalAmount) ? "PAID" : 
-                         newPaidAmount > 0 ? "PARTIAL" : "PENDING";
-        
-        await storage.updateInvoice(invoice.id, {
-          paidAmount: newPaidAmount.toString(),
-          paymentStatus: newStatus as any,
-        });
-      }
+      // Update invoice status and paid amount
+      await storage.updateInvoicePaymentStatus(payment.invoiceId, payment.amount);
       
       await storage.createAuditLog({
         userId: req.session.user?.id,
@@ -1105,6 +1153,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Create payment error:", error);
       res.status(500).json({ error: "Failed to create payment" });
+    }
+  });
+
+  app.put("/api/payments/:id", requireAuth, requireRole(["ACCOUNTANT", "ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const paymentId = req.params.id;
+      const updateData = req.body;
+      const oldPayment = await storage.getPayment(paymentId);
+      
+      if (!oldPayment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+
+      const updatedPayment = await storage.updatePayment(paymentId, updateData);
+      
+      // Recalculate invoice payment status
+      const amountDifference = updateData.amount - oldPayment.amount;
+      await storage.updateInvoicePaymentStatus(oldPayment.invoiceId, amountDifference);
+      
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "UPDATE",
+        tableName: "payments",
+        recordId: paymentId,
+        oldValues: oldPayment,
+        newValues: updateData,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json(updatedPayment);
+    } catch (error) {
+      console.error("Update payment error:", error);
+      res.status(500).json({ error: "Failed to update payment" });
+    }
+  });
+
+  app.delete("/api/payments/:id", requireAuth, requireRole(["ACCOUNTANT", "ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const paymentId = req.params.id;
+      const payment = await storage.getPayment(paymentId);
+      
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+
+      const deleted = await storage.deletePayment(paymentId);
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete payment" });
+      }
+
+      // Update invoice payment status (subtract the deleted payment)
+      await storage.updateInvoicePaymentStatus(payment.invoiceId, -payment.amount);
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "DELETE",
+        tableName: "payments",
+        recordId: paymentId,
+        oldValues: payment,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json({ message: "Payment deleted successfully" });
+    } catch (error) {
+      console.error("Delete payment error:", error);
+      res.status(500).json({ error: "Failed to delete payment" });
+    }
+  });
+
+  // Billing reports and statistics routes
+  app.get("/api/billing/daily-close", requireAuth, requireRole(["ACCOUNTANT", "ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const { date } = req.query;
+      const targetDate = date ? new Date(date as string) : new Date();
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const payments = await storage.getPaymentsByDateRange(startOfDay, endOfDay);
+      
+      // Group by payment method
+      const summary = payments.reduce((acc: any, payment: any) => {
+        const method = payment.method || 'UNKNOWN';
+        if (!acc[method]) {
+          acc[method] = { count: 0, total: 0 };
+        }
+        acc[method].count++;
+        acc[method].total += parseFloat(payment.amount);
+        return acc;
+      }, {});
+
+      const totalAmount = payments.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0);
+      const totalTransactions = payments.length;
+
+      res.json({
+        date: targetDate.toISOString().split('T')[0],
+        totalAmount,
+        totalTransactions,
+        paymentMethodSummary: summary,
+        payments
+      });
+    } catch (error) {
+      console.error("Daily close error:", error);
+      res.status(500).json({ error: "Failed to generate daily close report" });
+    }
+  });
+
+  app.get("/api/billing/reports/revenue", requireAuth, requireRole(["ACCOUNTANT", "ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const { from, to, groupBy = 'day' } = req.query;
+      const fromDate = from ? new Date(from as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const toDate = to ? new Date(to as string) : new Date();
+
+      const payments = await storage.getPaymentsByDateRange(fromDate, toDate);
+      
+      res.json({
+        fromDate: fromDate.toISOString().split('T')[0],
+        toDate: toDate.toISOString().split('T')[0],
+        totalRevenue: payments.reduce((sum: number, payment: any) => sum + parseFloat(payment.amount), 0),
+        totalTransactions: payments.length,
+        payments
+      });
+    } catch (error) {
+      console.error("Revenue report error:", error);
+      res.status(500).json({ error: "Failed to generate revenue report" });
     }
   });
 
