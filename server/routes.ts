@@ -922,6 +922,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get weekly appointments for calendar view
+  app.get("/api/appointments/week", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const dateParam = req.query.date as string;
+      const baseDate = dateParam ? new Date(dateParam) : new Date();
+      
+      // Get start of week (Saturday) and end of week (Friday)
+      const startOfWeek = new Date(baseDate);
+      startOfWeek.setDate(baseDate.getDate() - baseDate.getDay() + 6); // Saturday
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6); // Friday
+      endOfWeek.setHours(23, 59, 59, 999);
+
+      const appointments = await storage.getWeeklyAppointments(startOfWeek);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Weekly appointments error:", error);
+      res.status(500).json({ error: "Failed to fetch weekly appointments" });
+    }
+  });
+
+  // Get available time slots for a specific date and doctor
+  app.get("/api/appointments/available-slots", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const dateParam = req.query.date as string;
+      const doctorId = req.query.doctorId as string || "";
+      const excludeAppointmentId = req.query.excludeId as string;
+      
+      if (!dateParam) {
+        return res.status(400).json({ error: "Date parameter required" });
+      }
+
+      const date = new Date(dateParam);
+      
+      // Check if it's Friday (day off)
+      if (date.getDay() === 5) {
+        return res.json({ slots: [] });
+      }
+      
+      const availableSlots = await storage.getAvailableTimeSlots(date, doctorId, excludeAppointmentId);
+      res.json({ slots: availableSlots });
+    } catch (error) {
+      console.error("Available slots error:", error);
+      res.status(500).json({ error: "Failed to fetch available slots" });
+    }
+  });
+
   // Visit management routes
   app.get("/api/visits", requireAuth, async (req: Request, res: Response) => {
     try {

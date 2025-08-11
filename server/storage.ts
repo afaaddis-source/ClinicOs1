@@ -790,7 +790,29 @@ export class PostgreSQLStorage implements IStorage {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    return await this.getAppointmentsByDateRange(startOfWeek, endOfWeek);
+    return await db.select({
+      id: appointments.id,
+      patientId: appointments.patientId,
+      doctorId: appointments.doctorId,
+      serviceId: appointments.serviceId,
+      appointmentDate: appointments.appointmentDate,
+      duration: appointments.duration,
+      status: appointments.status,
+      notes: appointments.notes,
+      createdAt: appointments.createdAt,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      serviceName: sql<string>`COALESCE(${services.nameEn}, ${services.nameAr})`,
+      doctorName: users.fullName
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(appointments.patientId, patients.id))
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .leftJoin(users, eq(appointments.doctorId, users.id))
+    .where(and(
+      gte(appointments.appointmentDate, startOfWeek),
+      lte(appointments.appointmentDate, endOfWeek)
+    ))
+    .orderBy(appointments.appointmentDate);
   }
 
 
