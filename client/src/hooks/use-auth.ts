@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 interface User {
   id: string;
@@ -37,14 +38,14 @@ const authApi = {
   },
 
   logout: async (): Promise<void> => {
-    const response = await fetch("/api/auth/logout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    
-    if (!response.ok) {
-      throw new Error("Logout failed");
+    try {
+      await apiRequest("/api/auth/logout", { method: "POST" });
+    } catch (error: any) {
+      // If CSRF error, allow logout to proceed since session might be expired
+      if (error.message?.includes("403") && error.message?.includes("CSRF")) {
+        return; // Allow logout to proceed even with CSRF error
+      }
+      throw error;
     }
   },
 

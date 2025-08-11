@@ -205,6 +205,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ user: req.session.user });
   });
 
+  // CSRF token endpoint
+  app.get("/api/csrf-token", (req: Request, res: Response) => {
+    res.json({ csrfToken: req.csrfToken() });
+  });
+
   // Dashboard routes
   app.get("/api/dashboard/stats", requireAuth, async (req: Request, res: Response) => {
     try {
