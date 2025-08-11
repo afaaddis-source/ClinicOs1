@@ -1128,13 +1128,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transactionId: req.body.transactionReference || req.body.transactionId,
         paymentDate: new Date(),
         notes: req.body.notes,
-        receivedBy: req.session.user?.id,
+        receivedBy: req.session.user!.id,
       };
 
       const payment = await storage.createPayment(paymentData);
       
       // Update invoice status and paid amount
-      await storage.updateInvoicePaymentStatus(payment.invoiceId, payment.amount);
+      await storage.updateInvoicePaymentStatus(payment.invoiceId, Number(payment.amount));
       
       await storage.createAuditLog({
         userId: req.session.user?.id,
@@ -1169,7 +1169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedPayment = await storage.updatePayment(paymentId, updateData);
       
       // Recalculate invoice payment status
-      const amountDifference = updateData.amount - oldPayment.amount;
+      const amountDifference = Number(updateData.amount) - Number(oldPayment.amount);
       await storage.updateInvoicePaymentStatus(oldPayment.invoiceId, amountDifference);
       
       await storage.createAuditLog({
@@ -1297,6 +1297,294 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get doctors error:", error);
       res.status(500).json({ error: "Failed to fetch doctors" });
+    }
+  });
+
+  // Admin API routes for services management
+  app.get("/api/admin/services", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const services = await storage.getAllServices();
+      res.json(services);
+    } catch (error) {
+      console.error("Get services error:", error);
+      res.status(500).json({ error: "Failed to fetch services" });
+    }
+  });
+
+  app.post("/api/admin/services", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const serviceData = {
+        code: req.body.code,
+        nameAr: req.body.nameAr,
+        nameEn: req.body.nameEn,
+        descriptionAr: req.body.descriptionAr,
+        descriptionEn: req.body.descriptionEn,
+        price: req.body.price,
+        duration: parseInt(req.body.duration) || 30,
+        category: req.body.category,
+        isActive: req.body.isActive !== false
+      };
+
+      const service = await storage.createService(serviceData);
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "CREATE",
+        tableName: "services",
+        recordId: service.id,
+        newValues: serviceData,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.status(201).json(service);
+    } catch (error) {
+      console.error("Create service error:", error);
+      res.status(500).json({ error: "Failed to create service" });
+    }
+  });
+
+  app.put("/api/admin/services/:id", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const serviceData = {
+        code: req.body.code,
+        nameAr: req.body.nameAr,
+        nameEn: req.body.nameEn,
+        descriptionAr: req.body.descriptionAr,
+        descriptionEn: req.body.descriptionEn,
+        price: req.body.price,
+        duration: parseInt(req.body.duration) || 30,
+        category: req.body.category,
+        isActive: req.body.isActive
+      };
+
+      const oldService = await storage.getService(req.params.id);
+      const service = await storage.updateService(req.params.id, serviceData);
+
+      if (!service) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "UPDATE",
+        tableName: "services",
+        recordId: service.id,
+        oldValues: oldService,
+        newValues: serviceData,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json(service);
+    } catch (error) {
+      console.error("Update service error:", error);
+      res.status(500).json({ error: "Failed to update service" });
+    }
+  });
+
+  app.delete("/api/admin/services/:id", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      // Check if service is referenced
+      const isReferenced = await storage.isServiceReferenced(req.params.id);
+      if (isReferenced) {
+        return res.status(409).json({ 
+          error: "Cannot delete service as it is referenced in appointments or invoices" 
+        });
+      }
+
+      const service = await storage.getService(req.params.id);
+      const deleted = await storage.deleteService(req.params.id);
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.user?.id,
+        action: "DELETE",
+        tableName: "services",
+        recordId: req.params.id,
+        oldValues: service,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      res.json({ message: "Service deleted successfully" });
+    } catch (error) {
+      console.error("Delete service error:", error);
+      res.status(500).json({ error: "Failed to delete service" });
+    }
+  });
+
+  // Settings management routes
+  app.get("/api/admin/settings", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const { category } = req.query;
+      let settings;
+      
+      if (category && typeof category === "string") {
+        settings = await storage.getSettingsByCategory(category);
+      } else {
+        settings = await storage.getAllSettings();
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Get settings error:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  app.post("/api/admin/settings", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const settingData = {
+        key: req.body.key,
+        value: req.body.value,
+        description: req.body.description,
+        category: req.body.category || "GENERAL"
+      };
+
+      const setting = await storage.createSetting(settingData);
+      res.status(201).json(setting);
+    } catch (error) {
+      console.error("Create setting error:", error);
+      res.status(500).json({ error: "Failed to create setting" });
+    }
+  });
+
+  app.put("/api/admin/settings/:id", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const setting = await storage.updateSetting(req.params.id, {
+        value: req.body.value,
+        description: req.body.description
+      });
+
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+
+      res.json(setting);
+    } catch (error) {
+      console.error("Update setting error:", error);
+      res.status(500).json({ error: "Failed to update setting" });
+    }
+  });
+
+  // Clinic info management routes
+  app.get("/api/admin/clinic-info", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const clinicInfo = await storage.getClinicInfo();
+      res.json(clinicInfo);
+    } catch (error) {
+      console.error("Get clinic info error:", error);
+      res.status(500).json({ error: "Failed to fetch clinic info" });
+    }
+  });
+
+  app.post("/api/admin/clinic-info", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const clinicData = {
+        nameAr: req.body.nameAr,
+        nameEn: req.body.nameEn,
+        phone: req.body.phone,
+        addressAr: req.body.addressAr,
+        addressEn: req.body.addressEn,
+        email: req.body.email,
+        website: req.body.website
+      };
+
+      const clinicInfo = await storage.createClinicInfo(clinicData);
+      res.status(201).json(clinicInfo);
+    } catch (error) {
+      console.error("Create clinic info error:", error);
+      res.status(500).json({ error: "Failed to create clinic info" });
+    }
+  });
+
+  app.put("/api/admin/clinic-info/:id", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const clinicData = {
+        nameAr: req.body.nameAr,
+        nameEn: req.body.nameEn,
+        phone: req.body.phone,
+        addressAr: req.body.addressAr,
+        addressEn: req.body.addressEn,
+        email: req.body.email,
+        website: req.body.website
+      };
+
+      const clinicInfo = await storage.updateClinicInfo(req.params.id, clinicData);
+
+      if (!clinicInfo) {
+        return res.status(404).json({ error: "Clinic info not found" });
+      }
+
+      res.json(clinicInfo);
+    } catch (error) {
+      console.error("Update clinic info error:", error);
+      res.status(500).json({ error: "Failed to update clinic info" });
+    }
+  });
+
+  // Reports routes
+  app.get("/api/admin/reports/revenue-by-month", requireAuth, requireRole(["ADMIN", "ACCOUNTANT"]), async (req: Request, res: Response) => {
+    try {
+      const data = await storage.getRevenueByMonth();
+      res.json(data);
+    } catch (error) {
+      console.error("Revenue by month error:", error);
+      res.status(500).json({ error: "Failed to fetch revenue by month" });
+    }
+  });
+
+  app.get("/api/admin/reports/visits-by-service", requireAuth, requireRole(["ADMIN", "ACCOUNTANT"]), async (req: Request, res: Response) => {
+    try {
+      const data = await storage.getVisitsByService();
+      res.json(data);
+    } catch (error) {
+      console.error("Visits by service error:", error);
+      res.status(500).json({ error: "Failed to fetch visits by service" });
+    }
+  });
+
+  app.get("/api/admin/reports/no-shows", requireAuth, requireRole(["ADMIN", "ACCOUNTANT"]), async (req: Request, res: Response) => {
+    try {
+      const data = await storage.getNoShowStats();
+      res.json(data);
+    } catch (error) {
+      console.error("No show stats error:", error);
+      res.status(500).json({ error: "Failed to fetch no-show statistics" });
+    }
+  });
+
+  app.get("/api/admin/reports/aging-receivables", requireAuth, requireRole(["ADMIN", "ACCOUNTANT"]), async (req: Request, res: Response) => {
+    try {
+      const data = await storage.getAgingReceivables();
+      res.json(data);
+    } catch (error) {
+      console.error("Aging receivables error:", error);
+      res.status(500).json({ error: "Failed to fetch aging receivables" });
+    }
+  });
+
+  // Backup route
+  app.get("/api/admin/backup", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `clinicos-backup-${timestamp}.sql`;
+
+      // Note: This is a placeholder for database backup functionality
+      // In a production environment, you would use pg_dump or similar tools
+      res.setHeader('Content-Type', 'application/sql');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.status(501).json({ 
+        error: "Database backup functionality not implemented", 
+        note: "Please use database panel for backups" 
+      });
+    } catch (error) {
+      console.error("Backup error:", error);
+      res.status(500).json({ error: "Failed to create backup" });
     }
   });
 

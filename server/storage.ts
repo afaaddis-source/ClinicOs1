@@ -13,6 +13,8 @@ import {
   payments,
   patientFiles,
   auditLogs,
+  settings,
+  clinicInfo,
   type User,
   type InsertUser,
   type Patient,
@@ -32,6 +34,10 @@ import {
   type PatientFile,
   type InsertPatientFile,
   type AuditLog,
+  type Setting,
+  type InsertSetting,
+  type ClinicInfo,
+  type InsertClinicInfo,
 } from "@shared/schema";
 
 const sql_connection = neon(process.env.DATABASE_URL!);
@@ -144,6 +150,28 @@ export interface IStorage {
   checkAppointmentConflict(appointmentDate: Date, duration: number, doctorId: string, excludeAppointmentId?: string): Promise<boolean>;
   getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<any[]>;
   getWeeklyAppointments(startOfWeek: Date): Promise<any[]>;
+
+  // Settings management
+  getSetting(key: string): Promise<Setting | undefined>;
+  getSettingsByCategory(category: string): Promise<Setting[]>;
+  getAllSettings(): Promise<Setting[]>;
+  createSetting(setting: InsertSetting): Promise<Setting>;
+  updateSetting(id: string, setting: Partial<InsertSetting>): Promise<Setting | undefined>;
+  deleteSetting(id: string): Promise<boolean>;
+
+  // Clinic Info management
+  getClinicInfo(): Promise<ClinicInfo | undefined>;
+  createClinicInfo(info: InsertClinicInfo): Promise<ClinicInfo>;
+  updateClinicInfo(id: string, info: Partial<InsertClinicInfo>): Promise<ClinicInfo | undefined>;
+
+  // Reports and Analytics
+  getRevenueByMonth(): Promise<any[]>;
+  getVisitsByService(): Promise<any[]>;
+  getNoShowStats(): Promise<any>;
+  getAgingReceivables(): Promise<any>;
+
+  // Service checks for referential integrity
+  isServiceReferenced(serviceId: string): Promise<boolean>;
 }
 
 export class PostgreSQLStorage implements IStorage {
@@ -938,6 +966,128 @@ export class PostgreSQLStorage implements IStorage {
     .orderBy(appointments.appointmentDate);
   }
 
+  // Settings management
+  async getSetting(key: string): Promise<Setting | undefined> {
+    const result = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+    return result[0];
+  }
+
+  async getSettingsByCategory(category: string): Promise<Setting[]> {
+    return await db.select().from(settings).where(eq(settings.category, category)).orderBy(settings.key);
+  }
+
+  async getAllSettings(): Promise<Setting[]> {
+    return await db.select().from(settings).orderBy(settings.category, settings.key);
+  }
+
+  async createSetting(setting: InsertSetting): Promise<Setting> {
+    const result = await db.insert(settings).values(setting).returning();
+    return result[0];
+  }
+
+  async updateSetting(id: string, setting: Partial<InsertSetting>): Promise<Setting | undefined> {
+    const updateData = { ...setting, updatedAt: new Date() };
+    const result = await db.update(settings).set(updateData).where(eq(settings.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteSetting(id: string): Promise<boolean> {
+    const result = await db.delete(settings).where(eq(settings.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Clinic Info management
+  async getClinicInfo(): Promise<ClinicInfo | undefined> {
+    const result = await db.select().from(clinicInfo).limit(1);
+    return result[0];
+  }
+
+  async createClinicInfo(info: InsertClinicInfo): Promise<ClinicInfo> {
+    const result = await db.insert(clinicInfo).values(info).returning();
+    return result[0];
+  }
+
+  async updateClinicInfo(id: string, info: Partial<InsertClinicInfo>): Promise<ClinicInfo | undefined> {
+    const updateData = { ...info, updatedAt: new Date() };
+    const result = await db.update(clinicInfo).set(updateData).where(eq(clinicInfo.id, id)).returning();
+    return result[0];
+  }
+
+  // Reports and Analytics
+  async getRevenueByMonth(): Promise<any[]> {
+    return await db.select({
+      month: sql<string>`TO_CHAR(${invoices.issueDate}, 'YYYY-MM')`,
+      revenue: sql<number>`SUM(${invoices.totalAmount})`
+    })
+    .from(invoices)
+    .where(sql`${invoices.issueDate} >= CURRENT_DATE - INTERVAL '12 months'`)
+    .groupBy(sql`TO_CHAR(${invoices.issueDate}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${invoices.issueDate}, 'YYYY-MM')`);
+  }
+
+  async getVisitsByService(): Promise<any[]> {
+    return await db.select({
+      serviceName: services.nameEn,
+      serviceNameAr: services.nameAr,
+      count: sql<number>`COUNT(*)`
+    })
+    .from(visits)
+    .leftJoin(appointments, eq(visits.appointmentId, appointments.id))
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .where(sql`${visits.visitDate} >= CURRENT_DATE - INTERVAL '6 months'`)
+    .groupBy(services.id, services.nameEn, services.nameAr)
+    .orderBy(sql`COUNT(*) DESC`);
+  }
+
+  async getNoShowStats(): Promise<any> {
+    const totalAppointments = await db.select({ count: sql<number>`COUNT(*)` })
+      .from(appointments)
+      .where(sql`${appointments.appointmentDate} >= CURRENT_DATE - INTERVAL '3 months'`);
+
+    const noShows = await db.select({ count: sql<number>`COUNT(*)` })
+      .from(appointments)
+      .where(and(
+        eq(appointments.status, 'NO_SHOW'),
+        sql`${appointments.appointmentDate} >= CURRENT_DATE - INTERVAL '3 months'`
+      ));
+
+    const total = totalAppointments[0].count;
+    const noShowCount = noShows[0].count;
+    
+    return {
+      totalAppointments: total,
+      noShows: noShowCount,
+      noShowRate: total > 0 ? (noShowCount / total * 100).toFixed(2) : '0.00'
+    };
+  }
+
+  async getAgingReceivables(): Promise<any> {
+    const buckets = {
+      '0-30': sql<number>`SUM(CASE WHEN CURRENT_DATE - ${invoices.dueDate} BETWEEN 0 AND 30 THEN ${invoices.totalAmount} - ${invoices.paidAmount} ELSE 0 END)`,
+      '31-60': sql<number>`SUM(CASE WHEN CURRENT_DATE - ${invoices.dueDate} BETWEEN 31 AND 60 THEN ${invoices.totalAmount} - ${invoices.paidAmount} ELSE 0 END)`,
+      '61-90': sql<number>`SUM(CASE WHEN CURRENT_DATE - ${invoices.dueDate} BETWEEN 61 AND 90 THEN ${invoices.totalAmount} - ${invoices.paidAmount} ELSE 0 END)`,
+      '90+': sql<number>`SUM(CASE WHEN CURRENT_DATE - ${invoices.dueDate} > 90 THEN ${invoices.totalAmount} - ${invoices.paidAmount} ELSE 0 END)`
+    };
+
+    const result = await db.select(buckets)
+      .from(invoices)
+      .where(sql`${invoices.totalAmount} > ${invoices.paidAmount} AND ${invoices.dueDate} IS NOT NULL`);
+
+    return result[0] || { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
+  }
+
+  // Service checks for referential integrity
+  async isServiceReferenced(serviceId: string): Promise<boolean> {
+    const appointmentCount = await db.select({ count: sql<number>`COUNT(*)` })
+      .from(appointments)
+      .where(eq(appointments.serviceId, serviceId));
+
+    const invoiceItemCount = await db.select({ count: sql<number>`COUNT(*)` })
+      .from(invoiceItems)
+      .where(eq(invoiceItems.serviceId, serviceId));
+
+    return appointmentCount[0].count > 0 || invoiceItemCount[0].count > 0;
+  }
 
 }
 

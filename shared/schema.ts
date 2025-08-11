@@ -58,12 +58,13 @@ export const patients = pgTable("patients", {
 // Services table
 export const services = pgTable("services", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // Service code for identification
   nameAr: text("name_ar").notNull(),
   nameEn: text("name_en").notNull(),
   descriptionAr: text("description_ar"),
   descriptionEn: text("description_en"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  duration: integer("duration").notNull(), // in minutes
+  duration: integer("duration").notNull().default(30), // defaultMinutes in minutes
   category: text("category"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -176,6 +177,32 @@ export const auditLogs = pgTable("audit_logs", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+
+// Settings table for clinic configuration
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("GENERAL"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+});
+
+// Clinic Info table for print templates
+export const clinicInfo = pgTable("clinic_info", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nameAr: text("name_ar").notNull(),
+  nameEn: text("name_en").notNull(),
+  phone: text("phone").notNull(),
+  addressAr: text("address_ar").notNull(),
+  addressEn: text("address_en").notNull(),
+  email: text("email"),
+  website: text("website"),
+  logo: text("logo"), // Path to logo file
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
 });
 
 // Relations
@@ -317,6 +344,24 @@ export const insertServiceSchema = createInsertSchema(services).omit({
   id: true,
   createdAt: true,
   updatedAt: true
+}).extend({
+  code: z.string().min(1, "Service code is required"),
+  nameAr: z.string().min(1, "Arabic name is required"),
+  nameEn: z.string().min(1, "English name is required"),
+  price: z.string().min(1, "Price is required"),
+  duration: z.number().min(5, "Duration must be at least 5 minutes")
+});
+
+export const insertSettingSchema = createInsertSchema(settings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertClinicInfoSchema = createInsertSchema(clinicInfo).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 });
 
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({
@@ -379,6 +424,12 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 export type PatientFile = typeof patientFiles.$inferSelect;
 export type InsertPatientFile = z.infer<typeof insertPatientFileSchema>;
+
+export type Setting = typeof settings.$inferSelect;
+export type InsertSetting = z.infer<typeof insertSettingSchema>;
+
+export type ClinicInfo = typeof clinicInfo.$inferSelect;
+export type InsertClinicInfo = z.infer<typeof insertClinicInfoSchema>;
 
 // Visit-specific types
 export interface VisitProcedure {

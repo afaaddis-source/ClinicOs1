@@ -8,16 +8,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { LanguageContext } from "@/App";
 import { useUser } from "@/hooks/use-auth";
-import { Plus, Edit, KeyRound, Loader2, Shield } from "lucide-react";
+import { 
+  Plus, 
+  Edit, 
+  KeyRound, 
+  Loader2, 
+  Shield, 
+  Trash2, 
+  Settings, 
+  BarChart3, 
+  Download,
+  Clock,
+  MapPin,
+  Phone,
+  Mail,
+  Building
+} from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
+// Schemas
 const userSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -28,21 +47,65 @@ const userSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-const updateUserSchema = userSchema.partial().omit({ password: true });
-const passwordResetSchema = z.object({
-  password: z.string().min(6, "Password must be at least 6 characters"),
+const serviceSchema = z.object({
+  code: z.string().min(1, "Service code is required"),
+  nameAr: z.string().min(1, "Arabic name is required"),
+  nameEn: z.string().min(1, "English name is required"),
+  descriptionAr: z.string().optional(),
+  descriptionEn: z.string().optional(),
+  price: z.string().min(1, "Price is required"),
+  duration: z.number().min(5, "Duration must be at least 5 minutes"),
+  category: z.string().optional(),
+  isActive: z.boolean().default(true),
 });
 
-interface User {
+const settingSchema = z.object({
+  key: z.string().min(1, "Key is required"),
+  value: z.string().min(1, "Value is required"),
+  description: z.string().optional(),
+  category: z.string().default("GENERAL"),
+});
+
+const clinicInfoSchema = z.object({
+  nameAr: z.string().min(1, "Arabic name is required"),
+  nameEn: z.string().min(1, "English name is required"),
+  phone: z.string().min(1, "Phone is required"),
+  addressAr: z.string().min(1, "Arabic address is required"),
+  addressEn: z.string().min(1, "English address is required"),
+  email: z.string().email().optional(),
+  website: z.string().optional(),
+});
+
+interface Service {
   id: string;
-  username: string;
-  email?: string;
-  fullName: string;
-  role: string;
-  phone?: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  descriptionAr?: string;
+  descriptionEn?: string;
+  price: string;
+  duration: number;
+  category?: string;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+}
+
+interface Setting {
+  id: string;
+  key: string;
+  value: string;
+  description?: string;
+  category: string;
+}
+
+interface ClinicInfo {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  phone: string;
+  addressAr: string;
+  addressEn: string;
+  email?: string;
+  website?: string;
 }
 
 export default function AdminPage() {
@@ -51,10 +114,11 @@ export default function AdminPage() {
   const { toast } = useToast();
   const isArabic = language === 'ar';
 
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState("services");
+  const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
+  const [settingDialogOpen, setSettingDialogOpen] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [editingSetting, setEditingSetting] = useState<Setting | null>(null);
 
   // Check if current user is admin
   if (currentUser?.role !== 'ADMIN') {
@@ -71,512 +135,714 @@ export default function AdminPage() {
     );
   }
 
-  const { data: users, isLoading } = useQuery({
-    queryKey: ["/api/users"],
-    queryFn: async (): Promise<User[]> => {
-      const response = await fetch("/api/users", {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch users");
-      return response.json();
-    },
+  // Data queries
+  const { data: services, isLoading: servicesLoading } = useQuery({
+    queryKey: ["/api/admin/services"],
   });
 
-  const createForm = useForm({
-    resolver: zodResolver(userSchema),
+  const { data: settings, isLoading: settingsLoading } = useQuery({
+    queryKey: ["/api/admin/settings"],
+  });
+
+  const { data: clinicInfo } = useQuery({
+    queryKey: ["/api/admin/clinic-info"],
+  });
+
+  const { data: revenueData } = useQuery({
+    queryKey: ["/api/admin/reports/revenue-by-month"],
+  });
+
+  const { data: visitsData } = useQuery({
+    queryKey: ["/api/admin/reports/visits-by-service"],
+  });
+
+  const { data: noShowData } = useQuery({
+    queryKey: ["/api/admin/reports/no-shows"],
+  });
+
+  const { data: agingData } = useQuery({
+    queryKey: ["/api/admin/reports/aging-receivables"],
+  });
+
+  // Form setup
+  const serviceForm = useForm({
+    resolver: zodResolver(serviceSchema),
     defaultValues: {
-      username: "",
-      password: "",
-      email: "",
-      fullName: "",
-      role: "RECEPTION" as const,
-      phone: "",
+      code: "",
+      nameAr: "",
+      nameEn: "",
+      descriptionAr: "",
+      descriptionEn: "",
+      price: "",
+      duration: 30,
+      category: "",
       isActive: true,
     },
   });
 
-  const editForm = useForm({
-    resolver: zodResolver(updateUserSchema),
+  const settingForm = useForm({
+    resolver: zodResolver(settingSchema),
     defaultValues: {
-      username: "",
-      email: "",
-      fullName: "",
-      role: "RECEPTION" as const,
-      phone: "",
-      isActive: true,
+      key: "",
+      value: "",
+      description: "",
+      category: "GENERAL",
     },
   });
 
-  const passwordForm = useForm({
-    resolver: zodResolver(passwordResetSchema),
+  const clinicForm = useForm({
+    resolver: zodResolver(clinicInfoSchema),
     defaultValues: {
-      password: "",
+      nameAr: clinicInfo?.nameAr || "",
+      nameEn: clinicInfo?.nameEn || "",
+      phone: clinicInfo?.phone || "",
+      addressAr: clinicInfo?.addressAr || "",
+      addressEn: clinicInfo?.addressEn || "",
+      email: clinicInfo?.email || "",
+      website: clinicInfo?.website || "",
     },
   });
 
-  const createMutation = useMutation({
+  // Mutations
+  const createServiceMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/users", {
+      return await apiRequest("/api/admin/services", {
         method: "POST",
         body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      setCreateDialogOpen(false);
-      createForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+      setServiceDialogOpen(false);
+      setEditingService(null);
+      serviceForm.reset();
       toast({
         title: isArabic ? "تم الإنشاء بنجاح" : "Created successfully",
-        description: isArabic ? "تم إنشاء المستخدم بنجاح" : "User created successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: isArabic ? "خطأ" : "Error",
-        description: error.message || (isArabic ? "حدث خطأ أثناء إنشاء المستخدم" : "Failed to create user"),
-        variant: "destructive",
       });
     },
   });
 
-  const updateMutation = useMutation({
+  const updateServiceMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return await apiRequest(`/api/users/${id}`, {
+      return await apiRequest(`/api/admin/services/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      setEditDialogOpen(false);
-      setSelectedUser(null);
-      editForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+      setServiceDialogOpen(false);
+      setEditingService(null);
+      serviceForm.reset();
       toast({
         title: isArabic ? "تم التحديث بنجاح" : "Updated successfully",
-        description: isArabic ? "تم تحديث المستخدم بنجاح" : "User updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: isArabic ? "خطأ" : "Error",
-        description: error.message || (isArabic ? "حدث خطأ أثناء تحديث المستخدم" : "Failed to update user"),
-        variant: "destructive",
       });
     },
   });
 
-  const passwordResetMutation = useMutation({
-    mutationFn: async ({ id, password }: { id: string; password: string }) => {
-      return await apiRequest(`/api/users/${id}/reset-password`, {
-        method: "POST",
-        body: JSON.stringify({ password }),
+  const deleteServiceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/admin/services/${id}`, {
+        method: "DELETE",
       });
     },
     onSuccess: () => {
-      setPasswordDialogOpen(false);
-      setSelectedUser(null);
-      passwordForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
       toast({
-        title: isArabic ? "تم إعادة تعيين كلمة المرور" : "Password reset",
-        description: isArabic ? "تم إعادة تعيين كلمة المرور بنجاح" : "Password reset successfully",
+        title: isArabic ? "تم الحذف بنجاح" : "Deleted successfully",
       });
     },
     onError: (error: any) => {
       toast({
         title: isArabic ? "خطأ" : "Error",
-        description: error.message || (isArabic ? "حدث خطأ أثناء إعادة تعيين كلمة المرور" : "Failed to reset password"),
+        description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const handleEdit = (user: User) => {
-    setSelectedUser(user);
-    editForm.reset({
-      username: user.username,
-      email: user.email || "",
-      fullName: user.fullName,
-      role: user.role as any,
-      phone: user.phone || "",
-      isActive: user.isActive,
+  const saveClinicInfoMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (clinicInfo?.id) {
+        return await apiRequest(`/api/admin/clinic-info/${clinicInfo.id}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        });
+      } else {
+        return await apiRequest("/api/admin/clinic-info", {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/clinic-info"] });
+      toast({
+        title: isArabic ? "تم الحفظ بنجاح" : "Saved successfully",
+      });
+    },
+  });
+
+  // Handlers
+  const handleEditService = (service: Service) => {
+    setEditingService(service);
+    serviceForm.reset({
+      code: service.code,
+      nameAr: service.nameAr,
+      nameEn: service.nameEn,
+      descriptionAr: service.descriptionAr || "",
+      descriptionEn: service.descriptionEn || "",
+      price: service.price,
+      duration: service.duration,
+      category: service.category || "",
+      isActive: service.isActive,
     });
-    setEditDialogOpen(true);
+    setServiceDialogOpen(true);
   };
 
-  const handlePasswordReset = (user: User) => {
-    setSelectedUser(user);
-    passwordForm.reset({ password: "" });
-    setPasswordDialogOpen(true);
-  };
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'ADMIN': return isArabic ? 'مدير' : 'Admin';
-      case 'DOCTOR': return isArabic ? 'طبيب' : 'Doctor';
-      case 'RECEPTION': return isArabic ? 'استقبال' : 'Reception';
-      case 'ACCOUNTANT': return isArabic ? 'محاسب' : 'Accountant';
-      default: return role;
+  const handleDeleteService = (id: string) => {
+    if (confirm(isArabic ? 'هل أنت متأكد من حذف هذه الخدمة؟' : 'Are you sure you want to delete this service?')) {
+      deleteServiceMutation.mutate(id);
     }
   };
 
-  const getRoleVariant = (role: string) => {
-    switch (role) {
-      case 'ADMIN': return 'destructive';
-      case 'DOCTOR': return 'default';
-      case 'RECEPTION': return 'secondary';
-      case 'ACCOUNTANT': return 'outline';
-      default: return 'secondary';
-    }
+  const handleBackup = () => {
+    window.open('/api/admin/backup', '_blank');
   };
 
   return (
     <div className="p-6" data-testid="admin-page">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2" data-testid="text-admin-title">
-            {isArabic ? 'إدارة المستخدمين' : 'User Management'}
-          </h1>
-          <p className="text-muted-foreground">
-            {isArabic ? 'إدارة حسابات المستخدمين والصلاحيات' : 'Manage user accounts and permissions'}
-          </p>
-        </div>
-
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              {isArabic ? 'إضافة مستخدم' : 'Add User'}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>
-                {isArabic ? 'إضافة مستخدم جديد' : 'Add New User'}
-              </DialogTitle>
-              <DialogDescription>
-                {isArabic ? 'أدخل بيانات المستخدم الجديد' : 'Enter the new user details'}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...createForm}>
-              <form onSubmit={createForm.handleSubmit((data) => createMutation.mutate(data))} className="space-y-4">
-                <FormField
-                  control={createForm.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isArabic ? 'اسم المستخدم' : 'Username'}</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={createForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isArabic ? 'كلمة المرور' : 'Password'}</FormLabel>
-                      <FormControl>
-                        <Input type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={createForm.control}
-                  name="fullName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isArabic ? 'الاسم الكامل' : 'Full Name'}</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={createForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isArabic ? 'البريد الإلكتروني' : 'Email'}</FormLabel>
-                      <FormControl>
-                        <Input type="email" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={createForm.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isArabic ? 'رقم الهاتف' : 'Phone'}</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={createForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isArabic ? 'الدور' : 'Role'}</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="ADMIN">{isArabic ? 'مدير' : 'Admin'}</SelectItem>
-                          <SelectItem value="DOCTOR">{isArabic ? 'طبيب' : 'Doctor'}</SelectItem>
-                          <SelectItem value="RECEPTION">{isArabic ? 'استقبال' : 'Reception'}</SelectItem>
-                          <SelectItem value="ACCOUNTANT">{isArabic ? 'محاسب' : 'Accountant'}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <DialogFooter>
-                  <Button type="submit" disabled={createMutation.isPending}>
-                    {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isArabic ? 'إنشاء' : 'Create'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2" data-testid="text-admin-title">
+          {isArabic ? 'لوحة الإدارة' : 'Admin Panel'}
+        </h1>
+        <p className="text-muted-foreground">
+          {isArabic ? 'إدارة النظام والإعدادات' : 'Manage system and settings'}
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{isArabic ? 'المستخدمين' : 'Users'}</CardTitle>
-          <CardDescription>
-            {isArabic ? 'قائمة بجميع المستخدمين في النظام' : 'List of all users in the system'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="services" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            {isArabic ? 'الخدمات' : 'Services'}
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            {isArabic ? 'الإعدادات' : 'Settings'}
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            {isArabic ? 'التقارير' : 'Reports'}
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            {isArabic ? 'النسخ الاحتياطي' : 'Backup'}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Services Tab */}
+        <TabsContent value="services" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">
+                {isArabic ? 'إدارة الخدمات' : 'Services Management'}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {isArabic ? 'إضافة وتعديل وحذف خدمات العيادة' : 'Add, edit, and delete clinic services'}
+              </p>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{isArabic ? 'اسم المستخدم' : 'Username'}</TableHead>
-                  <TableHead>{isArabic ? 'الاسم الكامل' : 'Full Name'}</TableHead>
-                  <TableHead>{isArabic ? 'البريد الإلكتروني' : 'Email'}</TableHead>
-                  <TableHead>{isArabic ? 'الدور' : 'Role'}</TableHead>
-                  <TableHead>{isArabic ? 'الحالة' : 'Status'}</TableHead>
-                  <TableHead className="text-right">{isArabic ? 'الإجراءات' : 'Actions'}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users?.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.username}</TableCell>
-                    <TableCell>{user.fullName}</TableCell>
-                    <TableCell>{user.email || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant={getRoleVariant(user.role) as any}>
-                        {getRoleLabel(user.role)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                        {user.isActive ? (isArabic ? 'نشط' : 'Active') : (isArabic ? 'غير نشط' : 'Inactive')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(user)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePasswordReset(user)}
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
+            <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {isArabic ? 'إضافة خدمة' : 'Add Service'}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingService ? 
+                      (isArabic ? 'تعديل الخدمة' : 'Edit Service') : 
+                      (isArabic ? 'إضافة خدمة جديدة' : 'Add New Service')
+                    }
+                  </DialogTitle>
+                </DialogHeader>
+                <Form {...serviceForm}>
+                  <form onSubmit={serviceForm.handleSubmit((data) => {
+                    if (editingService) {
+                      updateServiceMutation.mutate({ id: editingService.id, data });
+                    } else {
+                      createServiceMutation.mutate(data);
+                    }
+                  })} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={serviceForm.control}
+                        name="code"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'رمز الخدمة' : 'Service Code'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={serviceForm.control}
+                        name="duration"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'المدة (بالدقائق)' : 'Duration (minutes)'}</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={serviceForm.control}
+                        name="nameAr"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'الاسم بالعربية' : 'Arabic Name'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={serviceForm.control}
+                        name="nameEn"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'الاسم بالإنجليزية' : 'English Name'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={serviceForm.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'السعر' : 'Price'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={serviceForm.control}
+                        name="category"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'الفئة' : 'Category'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={serviceForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">
+                              {isArabic ? 'نشط' : 'Active'}
+                            </FormLabel>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <DialogFooter>
+                      <Button type="submit" disabled={createServiceMutation.isPending || updateServiceMutation.isPending}>
+                        {(createServiceMutation.isPending || updateServiceMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {editingService ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إنشاء' : 'Create')}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+            <CardContent>
+              {servicesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{isArabic ? 'الرمز' : 'Code'}</TableHead>
+                      <TableHead>{isArabic ? 'الاسم' : 'Name'}</TableHead>
+                      <TableHead>{isArabic ? 'السعر' : 'Price'}</TableHead>
+                      <TableHead>{isArabic ? 'المدة' : 'Duration'}</TableHead>
+                      <TableHead>{isArabic ? 'الحالة' : 'Status'}</TableHead>
+                      <TableHead className="text-right">{isArabic ? 'الإجراءات' : 'Actions'}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {services?.map((service: Service) => (
+                      <TableRow key={service.id}>
+                        <TableCell className="font-medium">{service.code}</TableCell>
+                        <TableCell>{isArabic ? service.nameAr : service.nameEn}</TableCell>
+                        <TableCell>{service.price}</TableCell>
+                        <TableCell>{service.duration} {isArabic ? 'دقيقة' : 'min'}</TableCell>
+                        <TableCell>
+                          <Badge variant={service.isActive ? 'default' : 'secondary'}>
+                            {service.isActive ? (isArabic ? 'نشط' : 'Active') : (isArabic ? 'غير نشط' : 'Inactive')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditService(service)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteService(service.id)}
+                              disabled={deleteServiceMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Settings Tab */}
+        <TabsContent value="settings" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Working Hours Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  {isArabic ? 'ساعات العمل' : 'Working Hours'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{isArabic ? 'بداية العمل' : 'Start Time'}</Label>
+                    <Input type="time" defaultValue="09:00" />
+                  </div>
+                  <div>
+                    <Label>{isArabic ? 'نهاية العمل' : 'End Time'}</Label>
+                    <Input type="time" defaultValue="21:00" />
+                  </div>
+                </div>
+                <div>
+                  <Label>{isArabic ? 'مدة الموعد (بالدقائق)' : 'Slot Length (minutes)'}</Label>
+                  <Input type="number" defaultValue="30" />
+                </div>
+                <div>
+                  <Label>{isArabic ? 'أيام الإجازة' : 'Days Closed'}</Label>
+                  <Select defaultValue="friday">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="friday">{isArabic ? 'الجمعة' : 'Friday'}</SelectItem>
+                      <SelectItem value="weekend">{isArabic ? 'نهاية الأسبوع' : 'Weekend'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button className="w-full">
+                  {isArabic ? 'حفظ الإعدادات' : 'Save Settings'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Clinic Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="h-5 w-5" />
+                  {isArabic ? 'معلومات العيادة' : 'Clinic Information'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...clinicForm}>
+                  <form onSubmit={clinicForm.handleSubmit((data) => saveClinicInfoMutation.mutate(data))} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={clinicForm.control}
+                        name="nameAr"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'اسم العيادة (عربي)' : 'Clinic Name (Arabic)'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={clinicForm.control}
+                        name="nameEn"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'اسم العيادة (إنجليزي)' : 'Clinic Name (English)'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={clinicForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{isArabic ? 'رقم الهاتف' : 'Phone'}</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={clinicForm.control}
+                        name="addressAr"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'العنوان (عربي)' : 'Address (Arabic)'}</FormLabel>
+                            <FormControl>
+                              <Textarea {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={clinicForm.control}
+                        name="addressEn"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'العنوان (إنجليزي)' : 'Address (English)'}</FormLabel>
+                            <FormControl>
+                              <Textarea {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Button type="submit" disabled={saveClinicInfoMutation.isPending} className="w-full">
+                      {saveClinicInfoMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isArabic ? 'حفظ المعلومات' : 'Save Information'}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Revenue by Month */}
+            <Card>
+              <CardHeader>
+                <CardTitle>{isArabic ? 'الإيرادات الشهرية' : 'Monthly Revenue'}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {revenueData && revenueData.length > 0 ? (
+                  <div className="space-y-2">
+                    {revenueData.map((item: any) => (
+                      <div key={item.month} className="flex justify-between">
+                        <span>{item.month}</span>
+                        <span className="font-semibold">{item.revenue}</span>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Edit User Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {isArabic ? 'تعديل المستخدم' : 'Edit User'}
-            </DialogTitle>
-            <DialogDescription>
-              {isArabic ? 'تعديل بيانات المستخدم' : 'Update user information'}
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit((data) => 
-              updateMutation.mutate({ id: selectedUser!.id, data })
-            )} className="space-y-4">
-              <FormField
-                control={editForm.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{isArabic ? 'اسم المستخدم' : 'Username'}</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">
+                    {isArabic ? 'لا توجد بيانات متاحة' : 'No data available'}
+                  </p>
                 )}
-              />
+              </CardContent>
+            </Card>
 
-              <FormField
-                control={editForm.control}
-                name="fullName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{isArabic ? 'الاسم الكامل' : 'Full Name'}</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+            {/* Visits by Service */}
+            <Card>
+              <CardHeader>
+                <CardTitle>{isArabic ? 'الزيارات حسب الخدمة' : 'Visits by Service'}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {visitsData && visitsData.length > 0 ? (
+                  <div className="space-y-2">
+                    {visitsData.slice(0, 10).map((item: any) => (
+                      <div key={item.serviceName} className="flex justify-between">
+                        <span>{isArabic ? item.serviceNameAr : item.serviceName}</span>
+                        <Badge variant="outline">{item.count}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">
+                    {isArabic ? 'لا توجد بيانات متاحة' : 'No data available'}
+                  </p>
                 )}
-              />
+              </CardContent>
+            </Card>
 
-              <FormField
-                control={editForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{isArabic ? 'البريد الإلكتروني' : 'Email'}</FormLabel>
-                    <FormControl>
-                      <Input type="email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+            {/* No-shows */}
+            <Card>
+              <CardHeader>
+                <CardTitle>{isArabic ? 'إحصائيات عدم الحضور' : 'No-Show Statistics'}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {noShowData ? (
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>{isArabic ? 'إجمالي المواعيد' : 'Total Appointments'}</span>
+                      <span className="font-semibold">{noShowData.totalAppointments}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{isArabic ? 'عدد عدم الحضور' : 'No Shows'}</span>
+                      <span className="font-semibold">{noShowData.noShows}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{isArabic ? 'معدل عدم الحضور' : 'No Show Rate'}</span>
+                      <Badge variant="outline">{noShowData.noShowRate}%</Badge>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">
+                    {isArabic ? 'لا توجد بيانات متاحة' : 'No data available'}
+                  </p>
                 )}
-              />
+              </CardContent>
+            </Card>
 
-              <FormField
-                control={editForm.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{isArabic ? 'رقم الهاتف' : 'Phone'}</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+            {/* Aging Receivables */}
+            <Card>
+              <CardHeader>
+                <CardTitle>{isArabic ? 'المستحقات المتقادمة' : 'Aging Receivables'}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {agingData ? (
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>0-30 {isArabic ? 'يوم' : 'days'}</span>
+                      <span className="font-semibold">{agingData['0-30']}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>31-60 {isArabic ? 'يوم' : 'days'}</span>
+                      <span className="font-semibold">{agingData['31-60']}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>61-90 {isArabic ? 'يوم' : 'days'}</span>
+                      <span className="font-semibold">{agingData['61-90']}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>90+ {isArabic ? 'يوم' : 'days'}</span>
+                      <span className="font-semibold">{agingData['90+']}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">
+                    {isArabic ? 'لا توجد بيانات متاحة' : 'No data available'}
+                  </p>
                 )}
-              />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-              <FormField
-                control={editForm.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{isArabic ? 'الدور' : 'Role'}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="ADMIN">{isArabic ? 'مدير' : 'Admin'}</SelectItem>
-                        <SelectItem value="DOCTOR">{isArabic ? 'طبيب' : 'Doctor'}</SelectItem>
-                        <SelectItem value="RECEPTION">{isArabic ? 'استقبال' : 'Reception'}</SelectItem>
-                        <SelectItem value="ACCOUNTANT">{isArabic ? 'محاسب' : 'Accountant'}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button type="submit" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isArabic ? 'حفظ' : 'Save'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Password Reset Dialog */}
-      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {isArabic ? 'إعادة تعيين كلمة المرور' : 'Reset Password'}
-            </DialogTitle>
-            <DialogDescription>
-              {isArabic ? `إعادة تعيين كلمة المرور للمستخدم: ${selectedUser?.fullName}` : 
-                       `Reset password for user: ${selectedUser?.fullName}`}
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...passwordForm}>
-            <form onSubmit={passwordForm.handleSubmit((data) => 
-              passwordResetMutation.mutate({ id: selectedUser!.id, password: data.password })
-            )} className="space-y-4">
-              <FormField
-                control={passwordForm.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{isArabic ? 'كلمة المرور الجديدة' : 'New Password'}</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button type="submit" disabled={passwordResetMutation.isPending}>
-                  {passwordResetMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isArabic ? 'إعادة تعيين' : 'Reset'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+        {/* Backup Tab */}
+        <TabsContent value="backup" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                {isArabic ? 'النسخ الاحتياطي' : 'Database Backup'}
+              </CardTitle>
+              <CardDescription>
+                {isArabic ? 'تحميل نسخة احتياطية من قاعدة البيانات' : 'Download a timestamped copy of the database'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h4 className="font-semibold text-yellow-800 mb-2">
+                  {isArabic ? 'النسخ الاحتياطي التلقائي' : 'Automated Daily Backups'}
+                </h4>
+                <p className="text-sm text-yellow-700">
+                  {isArabic ? 
+                    'يوصى بإعداد النسخ الاحتياطي التلقائي اليومي لضمان أمان البيانات. يمكنك استخدام لوحة قاعدة البيانات لإعداد هذا.' :
+                    'It is recommended to set up automated daily backups to ensure data safety. You can use the database panel to configure this.'
+                  }
+                </p>
+              </div>
+              
+              <Button onClick={handleBackup} className="w-full">
+                <Download className="h-4 w-4 mr-2" />
+                {isArabic ? 'تحميل النسخة الاحتياطية' : 'Download Backup'}
+              </Button>
+              
+              <div className="text-sm text-muted-foreground">
+                <p>
+                  {isArabic ? 
+                    'ملاحظة: سيتم تحميل ملف SQL يحتوي على بنية قاعدة البيانات والبيانات.' :
+                    'Note: This will download a SQL file containing the database structure and data.'
+                  }
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
