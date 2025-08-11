@@ -122,7 +122,19 @@ export default function AppointmentsPage() {
   const patientForm = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
     defaultValues: {
+      civilId: "",
+      firstName: "",
+      lastName: "",
+      phone: "",
+      email: "",
+      dateOfBirth: "",
+      gender: undefined,
+      address: "",
+      emergencyContact: "",
+      emergencyPhone: "",
       allergies: [],
+      medicalHistory: "",
+      notes: "",
     },
   });
 
@@ -516,7 +528,7 @@ export default function AppointmentsPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-mono text-lg">
-                        {format(parseISO(apt.appointmentDate), "HH:mm")}
+                        {format(parseISO(apt.appointmentDate.toString()), "HH:mm")}
                       </p>
                       <StatusBadge status={apt.status} />
                     </div>
@@ -598,6 +610,9 @@ export default function AppointmentsPage() {
                         <DialogContent className="max-w-2xl">
                           <DialogHeader>
                             <DialogTitle>{isArabic ? "إضافة مريض جديد" : "Add New Patient"}</DialogTitle>
+                            <DialogDescription>
+                              {isArabic ? "إدخال معلومات المريض الجديد" : "Enter new patient information"}
+                            </DialogDescription>
                           </DialogHeader>
                           <Form {...patientForm}>
                             <form onSubmit={patientForm.handleSubmit((data) => createPatientMutation.mutate(data))} className="space-y-4">
