@@ -89,7 +89,10 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
-
+        {/* Debug info */}
+        <div style={{ color: 'yellow', padding: '5px', fontSize: '12px' }}>
+          Lang: {language} | Items: {navigation.length} | RTL: {isRTL ? 'Yes' : 'No'}
+        </div>
         
         <nav className="space-y-1">
           {navigation.map((item) => {
@@ -118,9 +121,12 @@ export default function Sidebar() {
                   fontFamily: language === 'ar' ? "'Noto Sans Arabic', Arial, sans-serif" : 'inherit',
                   textAlign: language === 'ar' ? 'right' : 'left',
                   flex: 1,
-                  order: language === 'ar' ? 1 : 2
+                  order: language === 'ar' ? 1 : 2,
+                  border: '1px solid red', // Debug border
+                  minHeight: '20px',
+                  padding: '2px'
                 }}>
-                  {item.name}
+                  [{item.name}] - Len: {item.name?.length || 0}
                 </div>
               </div>
             );
