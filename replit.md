@@ -8,6 +8,14 @@ ClinicOS is a comprehensive clinic management system designed with Arabic as the
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### December 2024
+- **Arabic Navigation Fix**: Resolved Arabic sidebar navigation text visibility issue in RTL mode
+  - Root cause: Global RTL CSS rule `[dir="rtl"] .flex { flex-direction: row-reverse; }` was breaking navigation layout
+  - Solution: Added explicit flex direction control and proper ordering for Arabic navigation items
+  - Result: Arabic navigation menu now displays correctly with proper RTL text alignment
+
 ## System Architecture
 
 ### Frontend Architecture
