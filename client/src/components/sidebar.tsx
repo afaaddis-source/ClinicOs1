@@ -106,6 +106,7 @@ export default function Sidebar() {
                 style={{ 
                   display: 'flex',
                   alignItems: 'center',
+                  flexDirection: language === 'ar' ? 'row-reverse' : 'row',
                   gap: '12px',
                   padding: '12px 16px',
                   margin: '4px 8px',
@@ -115,13 +116,15 @@ export default function Sidebar() {
                 }}
                 onClick={() => window.location.href = item.href}
               >
-                <Icon size={20} style={{ color: 'white', flexShrink: 0 }} />
+                <Icon size={20} style={{ color: 'white', flexShrink: 0, order: language === 'ar' ? 2 : 1 }} />
                 <div style={{ 
                   color: 'white',
                   fontSize: '14px',
                   fontWeight: '500',
                   fontFamily: language === 'ar' ? "'Noto Sans Arabic', Arial, sans-serif" : 'inherit',
-                  direction: language === 'ar' ? 'rtl' : 'ltr'
+                  textAlign: language === 'ar' ? 'right' : 'left',
+                  flex: 1,
+                  order: language === 'ar' ? 1 : 2
                 }}>
                   {item.name}
                 </div>
