@@ -124,9 +124,10 @@
   text-align: right;
 }
 
-[dir="rtl"] .flex {
+/* Commented out to prevent navigation layout issues */
+/* [dir="rtl"] .flex {
   flex-direction: row-reverse;
-}
+} */
 
 [dir="rtl"] .space-x-2 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 1;

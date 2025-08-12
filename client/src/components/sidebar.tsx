@@ -20,33 +20,34 @@ export default function Sidebar() {
   const { user } = useUser();
   const logout = useLogout();
 
+  // Force navigation items with Arabic fallbacks
   const navigation = [
     {
-      name: t('nav.dashboard') || 'Dashboard',
+      name: language === 'ar' ? 'لوحة التحكم' : t('nav.dashboard'),
       href: '/dashboard',
       icon: LayoutDashboard,
       current: location === '/' || location === '/dashboard',
     },
     {
-      name: t('nav.patients') || 'Patients',
+      name: language === 'ar' ? 'المرضى' : t('nav.patients'),
       href: '/patients',
       icon: Users,
       current: location === '/patients',
     },
     {
-      name: t('nav.appointments') || 'Appointments',
+      name: language === 'ar' ? 'المواعيد' : t('nav.appointments'),
       href: '/appointments',
       icon: Calendar,
       current: location === '/appointments',
     },
     {
-      name: t('nav.visits') || 'Visits',
+      name: language === 'ar' ? 'الزيارات' : t('nav.visits'),
       href: '/visits',
       icon: Stethoscope,
       current: location === '/visits',
     },
     {
-      name: t('nav.billing') || 'Billing',
+      name: language === 'ar' ? 'الفواتير' : t('nav.billing'),
       href: '/billing',
       icon: CreditCard,
       current: location === '/billing',
