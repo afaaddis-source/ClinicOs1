@@ -15,11 +15,14 @@ import { apiRequest } from "@/lib/queryClient";
 import type { Patient } from "@shared/schema";
 
 const patientFormSchema = z.object({
-  civilId: z.string().min(12).max(12).regex(/^\d{12}$/, "Civil ID must be exactly 12 digits"),
+  civilId: z.string()
+    .min(12, "Civil ID must be exactly 12 digits")
+    .max(12, "Civil ID must be exactly 12 digits")
+    .regex(/^\d{12}$/, "Civil ID must contain only numbers (e.g., 123456789012)"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  phone: z.string().min(8, "Phone number is required"),
-  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().min(8, "Phone number is required (e.g., +96512345678)"),
+  email: z.string().email("Enter a valid email address").optional().or(z.literal("")),
   dateOfBirth: z.string().optional(),
   gender: z.enum(["MALE", "FEMALE"]).optional(),
   address: z.string().optional(),
@@ -63,26 +66,37 @@ export function PatientForm({ patient, onSuccess, onCancel }: PatientFormProps) 
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: PatientFormData) => apiRequest("/api/patients", {
-      method: "POST",
-      body: JSON.stringify({
-        ...data,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-        allergies: data.allergies?.filter(a => a.trim()) || []
-      }),
-    }),
+    mutationFn: async (data: PatientFormData) => {
+      const response = await apiRequest("/api/patients", {
+        method: "POST",
+        body: JSON.stringify({
+          ...data,
+          dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+          allergies: data.allergies?.filter(a => a.trim()) || []
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       toast({
         title: "Success",
         description: "Patient created successfully",
       });
+      form.reset();
       onSuccess?.();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
+      console.error("Create patient error:", error);
       toast({
-        title: "Error",
-        description: error.response?.data?.error || "Failed to create patient",
+        title: "Error Creating Patient",
+        description: error.message || "Failed to create patient",
         variant: "destructive",
       });
     },
@@ -152,9 +166,20 @@ export function PatientForm({ patient, onSuccess, onCancel }: PatientFormProps) 
                 name="civilId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Civil ID *</FormLabel>
+                    <FormLabel>Civil ID * (12 digits)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="123456789012" maxLength={12} data-testid="input-civil-id" />
+                      <Input 
+                        {...field} 
+                        placeholder="123456789012" 
+                        maxLength={12}
+                        pattern="[0-9]{12}"
+                        data-testid="input-civil-id"
+                        onInput={(e) => {
+                          // Only allow numeric input
+                          e.currentTarget.value = e.currentTarget.value.replace(/[^0-9]/g, '');
+                          field.onChange(e);
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
