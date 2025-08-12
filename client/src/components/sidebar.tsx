@@ -90,11 +90,12 @@ export default function Sidebar() {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
         {/* Debug info */}
-        <div style={{ color: 'yellow', padding: '5px', fontSize: '12px' }}>
+        <div style={{ color: 'yellow', padding: '5px', fontSize: '12px', background: 'rgba(0,0,0,0.5)' }}>
           Lang: {language} | Items: {navigation.length} | RTL: {isRTL ? 'Yes' : 'No'}
+          <br/>Nav Items: {JSON.stringify(navigation.map(n => n.name))}
         </div>
         
-        <nav className="space-y-1">
+        <nav className="space-y-1" style={{ display: 'block !important', visibility: 'visible !important' }}>
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
