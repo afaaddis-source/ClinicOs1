@@ -89,22 +89,40 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
+        {/* Test Arabic Text - Delete after confirming visibility */}
+        <div style={{ color: 'white', padding: '10px', fontSize: '16px', fontFamily: "'Noto Sans Arabic', Arial, sans-serif" }}>
+          Test Arabic: لوحة التحكم
+        </div>
+        
         <nav className="space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
-              <Link
+              <div
                 key={item.name}
-                href={item.href}
-                className={cn(
-                  "nav-link",
-                  item.current && "active"
-                )}
-                data-testid={`link-${item.href.slice(1)}`}
+                style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 16px',
+                  margin: '4px 8px',
+                  borderRadius: '8px',
+                  backgroundColor: item.current ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                  cursor: 'pointer'
+                }}
+                onClick={() => window.location.href = item.href}
               >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                <span className="nav-text">{item.name}</span>
-              </Link>
+                <Icon size={20} style={{ color: 'white', flexShrink: 0 }} />
+                <div style={{ 
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  fontFamily: language === 'ar' ? "'Noto Sans Arabic', Arial, sans-serif" : 'inherit',
+                  direction: language === 'ar' ? 'rtl' : 'ltr'
+                }}>
+                  {item.name}
+                </div>
+              </div>
             );
           })}
         </nav>
