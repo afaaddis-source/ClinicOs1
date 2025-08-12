@@ -95,41 +95,22 @@ export default function Sidebar() {
           <br/>Nav Items: {JSON.stringify(navigation.map(n => n.name))}
         </div>
         
-        <nav className="space-y-1" style={{ display: 'block !important', visibility: 'visible !important' }}>
+        <nav className="space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
-              <div
+              <Link
                 key={item.name}
-                style={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  flexDirection: language === 'ar' ? 'row-reverse' : 'row',
-                  gap: '12px',
-                  padding: '12px 16px',
-                  margin: '4px 8px',
-                  borderRadius: '8px',
-                  backgroundColor: item.current ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                  cursor: 'pointer'
-                }}
-                onClick={() => window.location.href = item.href}
+                href={item.href}
+                className={cn(
+                  "nav-link",
+                  item.current && "active"
+                )}
+                data-testid={`link-${item.href.slice(1)}`}
               >
-                <Icon size={20} style={{ color: 'white', flexShrink: 0, order: language === 'ar' ? 2 : 1 }} />
-                <div style={{ 
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  fontFamily: language === 'ar' ? "'Noto Sans Arabic', Arial, sans-serif" : 'inherit',
-                  textAlign: language === 'ar' ? 'right' : 'left',
-                  flex: 1,
-                  order: language === 'ar' ? 1 : 2,
-                  border: '1px solid red', // Debug border
-                  minHeight: '20px',
-                  padding: '2px'
-                }}>
-                  [{item.name}] - Len: {item.name?.length || 0}
-                </div>
-              </div>
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                <span className="nav-text">{item.name}</span>
+              </Link>
             );
           })}
         </nav>
