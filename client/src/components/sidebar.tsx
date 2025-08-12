@@ -90,8 +90,11 @@ export default function Sidebar() {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
         {/* Test Arabic Text - Delete after confirming visibility */}
-        <div style={{ color: 'white', padding: '10px', fontSize: '16px', fontFamily: "'Noto Sans Arabic', Arial, sans-serif" }}>
-          Test Arabic: لوحة التحكم
+        <div style={{ color: 'red', padding: '10px', fontSize: '18px', fontWeight: 'bold', background: 'yellow' }}>
+          Test: لوحة التحكم المرضى
+        </div>
+        <div style={{ color: 'white', padding: '10px', fontSize: '16px' }}>
+          English Test: Dashboard Patients
         </div>
         
         <nav className="space-y-1">
