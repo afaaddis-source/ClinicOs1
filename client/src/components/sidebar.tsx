@@ -57,7 +57,7 @@ export default function Sidebar() {
   // Add admin section for admin users
   if (user?.role === 'ADMIN') {
     navigation.push({
-      name: t('nav.admin'),
+      name: language === 'ar' ? 'الإدارة' : t('nav.admin'),
       href: '/admin',
       icon: Settings,
       current: location === '/admin',
@@ -90,13 +90,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
-        {/* Debug info */}
-        <div style={{ color: 'yellow', padding: '5px', fontSize: '12px', background: 'rgba(0,0,0,0.5)' }}>
-          Lang: {language} | Items: {navigation.length} | RTL: {isRTL ? 'Yes' : 'No'}
-          <br/>Nav Items: {JSON.stringify(navigation.map(n => n.name))}
-          <br/>t('nav.dashboard'): "{t('nav.dashboard')}"
-          <br/>t('nav.patients'): "{t('nav.patients')}"
-        </div>
+
         
         <nav className="space-y-1">
           {navigation.map((item) => {
