@@ -344,6 +344,25 @@ body {
   font-weight: 600;
 }
 
+.nav-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  line-height: 1.4;
+  display: inline-block;
+}
+
+.nav-link:hover .nav-text,
+.nav-link.active .nav-text {
+  color: white;
+}
+
+[dir="rtl"] .nav-text {
+  font-family: 'Noto Sans Arabic', 'Arial Unicode MS', Tahoma, sans-serif;
+  text-align: right;
+}
+
 /* Language toggle button */
 .language-toggle-btn {
   transition: all 0.2s ease !important;

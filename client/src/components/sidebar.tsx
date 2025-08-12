@@ -103,7 +103,7 @@ export default function Sidebar() {
                 data-testid={`link-${item.href.slice(1)}`}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
-                <span>{item.name}</span>
+                <span className="nav-text">{item.name}</span>
               </Link>
             );
           })}
