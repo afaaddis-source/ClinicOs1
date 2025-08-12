@@ -22,31 +22,31 @@ export default function Sidebar() {
 
   const navigation = [
     {
-      name: t('nav.dashboard'),
+      name: t('nav.dashboard') || 'Dashboard',
       href: '/dashboard',
       icon: LayoutDashboard,
       current: location === '/' || location === '/dashboard',
     },
     {
-      name: t('nav.patients'),
+      name: t('nav.patients') || 'Patients',
       href: '/patients',
       icon: Users,
       current: location === '/patients',
     },
     {
-      name: t('nav.appointments'),
+      name: t('nav.appointments') || 'Appointments',
       href: '/appointments',
       icon: Calendar,
       current: location === '/appointments',
     },
     {
-      name: t('nav.visits'),
+      name: t('nav.visits') || 'Visits',
       href: '/visits',
       icon: Stethoscope,
       current: location === '/visits',
     },
     {
-      name: t('nav.billing'),
+      name: t('nav.billing') || 'Billing',
       href: '/billing',
       icon: CreditCard,
       current: location === '/billing',
@@ -93,6 +93,8 @@ export default function Sidebar() {
         <div style={{ color: 'yellow', padding: '5px', fontSize: '12px', background: 'rgba(0,0,0,0.5)' }}>
           Lang: {language} | Items: {navigation.length} | RTL: {isRTL ? 'Yes' : 'No'}
           <br/>Nav Items: {JSON.stringify(navigation.map(n => n.name))}
+          <br/>t('nav.dashboard'): "{t('nav.dashboard')}"
+          <br/>t('nav.patients'): "{t('nav.patients')}"
         </div>
         
         <nav className="space-y-1">
