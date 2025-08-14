@@ -150,9 +150,9 @@ export default function LoginPage() {
                   </p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>admin/admin123</div>
-                    <div>dr.smith/admin123</div>
-                    <div>reception/admin123</div>
-                    <div>accountant/admin123</div>
+                    <div>doctor/doctor123</div>
+                    <div>reception/reception123</div>
+                    <div>accountant/accountant123</div>
                   </div>
                 </div>
               </AlertDescription>
