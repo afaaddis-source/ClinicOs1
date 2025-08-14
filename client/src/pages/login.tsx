@@ -78,6 +78,7 @@ export default function LoginPage() {
       const result = await response.json();
       
       if (!response.ok) {
+        console.log("Login failed with status:", response.status, "Error:", result.error);
         throw new Error(result.error || "Login failed");
       }
 
@@ -95,21 +96,10 @@ export default function LoginPage() {
     },
     onError: (error: Error) => {
       console.error("Login error:", error);
+      console.log("Error message:", error.message);
       
-      // Extract error message from server response
-      let errorMessage = error.message;
-      
-      // If it's a fetch error, try to extract the actual error message
-      if (errorMessage.includes('اسم المستخدم أو كلمة المرور غير صحيحة') || 
-          errorMessage.includes('Invalid credentials')) {
-        errorMessage = isArabic ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password';
-      } else if (errorMessage.includes('خطأ في الخادم الداخلي') || 
-                errorMessage.includes('Internal server error')) {
-        errorMessage = isArabic ? 'خطأ في الخادم الداخلي' : 'Internal server error';
-      } else if (errorMessage.includes('اسم المستخدم وكلمة المرور مطلوبان') || 
-                errorMessage.includes('Username and password required')) {
-        errorMessage = isArabic ? 'اسم المستخدم وكلمة المرور مطلوبان' : 'Username and password are required';
-      }
+      // Get the error message from the Error object
+      let errorMessage = error.message || (isArabic ? 'خطأ غير معروف' : 'Unknown error');
       
       toast({
         title: isArabic ? "خطأ في تسجيل الدخول" : "Login Error",

@@ -225,10 +225,14 @@ export class PostgreSQLStorage implements IStorage {
   async authenticateUser(username: string, password: string): Promise<User | undefined> {
     const user = await this.getUserByUsername(username);
     if (!user || !user.isActive) {
+      console.log("User not found or inactive:", { found: !!user, active: user?.isActive });
       return undefined;
     }
     
+    console.log("Comparing password for user:", user.username);
     const isValid = await bcrypt.compare(password, user.password);
+    console.log("Password comparison result:", isValid);
+    
     return isValid ? user : undefined;
   }
 
