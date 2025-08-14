@@ -137,13 +137,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
       
+      console.log("Login attempt:", { username, password: password ? '***' : 'null' });
+      
       if (!username || !password) {
+        console.log("Missing credentials:", { username: !!username, password: !!password });
         return res.status(400).json({ 
           error: req.acceptsLanguages('ar') ? "اسم المستخدم وكلمة المرور مطلوبان" : "Username and password required" 
         });
       }
 
+      // Debug: Check if user exists
+      const foundUser = await storage.getUserByUsername(username);
+      console.log("Found user:", foundUser ? { id: foundUser.id, username: foundUser.username, isActive: foundUser.isActive } : null);
+
       const user = await storage.authenticateUser(username, password);
+      console.log("Authentication result:", user ? { id: user.id, username: user.username, role: user.role } : null);
+      
       if (!user) {
         return res.status(401).json({ 
           error: req.acceptsLanguages('ar') ? "اسم المستخدم أو كلمة المرور غير صحيحة" : "Invalid credentials" 
@@ -157,14 +166,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: user.role,
       };
 
-      await storage.createAuditLog({
-        userId: user.id,
-        action: "LOGIN",
-        tableName: "users",
-        recordId: user.id,
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      });
+      try {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "LOGIN",
+          tableName: "users",
+          recordId: user.id,
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+        });
+      } catch (auditError) {
+        console.error("Audit log error:", auditError);
+        // Don't fail login for audit log error
+      }
 
       res.json({ 
         user: req.session.user,

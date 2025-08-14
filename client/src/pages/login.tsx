@@ -94,9 +94,26 @@ export default function LoginPage() {
       window.location.href = "/dashboard";
     },
     onError: (error: Error) => {
+      console.error("Login error:", error);
+      
+      // Extract error message from server response
+      let errorMessage = error.message;
+      
+      // If it's a fetch error, try to extract the actual error message
+      if (errorMessage.includes('اسم المستخدم أو كلمة المرور غير صحيحة') || 
+          errorMessage.includes('Invalid credentials')) {
+        errorMessage = isArabic ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password';
+      } else if (errorMessage.includes('خطأ في الخادم الداخلي') || 
+                errorMessage.includes('Internal server error')) {
+        errorMessage = isArabic ? 'خطأ في الخادم الداخلي' : 'Internal server error';
+      } else if (errorMessage.includes('اسم المستخدم وكلمة المرور مطلوبان') || 
+                errorMessage.includes('Username and password required')) {
+        errorMessage = isArabic ? 'اسم المستخدم وكلمة المرور مطلوبان' : 'Username and password are required';
+      }
+      
       toast({
-        title: isArabic ? "خطأ في تسجيل الدخول" : "Login error",
-        description: error.message,
+        title: isArabic ? "خطأ في تسجيل الدخول" : "Login Error",
+        description: errorMessage,
         variant: "destructive",
       });
     },
