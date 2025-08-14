@@ -28,6 +28,7 @@ export default function LoginPage() {
   const { user } = useUser();
   const [, navigate] = useLocation();
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const isArabic = language === 'ar';
 
@@ -99,17 +100,21 @@ export default function LoginPage() {
       console.log("Error message:", error.message);
       
       // Get the error message from the Error object
-      let errorMessage = error.message || (isArabic ? 'خطأ غير معروف' : 'Unknown error');
+      let errorMsg = error.message || (isArabic ? 'خطأ غير معروف' : 'Unknown error');
+      
+      console.log("Showing toast with message:", errorMsg);
+      setErrorMessage(errorMsg);
       
       toast({
         title: isArabic ? "خطأ في تسجيل الدخول" : "Login Error",
-        description: errorMessage,
+        description: errorMsg,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: LoginFormData) => {
+    setErrorMessage(''); // Clear any previous error message
     loginMutation.mutate(data);
   };
 
@@ -164,6 +169,16 @@ export default function LoginPage() {
                 </div>
               </AlertDescription>
             </Alert>
+
+            {/* Error Message Display */}
+            {errorMessage && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {errorMessage}
+                </AlertDescription>
+              </Alert>
+            )}
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
