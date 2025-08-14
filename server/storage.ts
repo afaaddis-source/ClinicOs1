@@ -1,5 +1,5 @@
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { eq, and, like, desc, gte, lte, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import {
@@ -40,8 +40,11 @@ import {
   type InsertClinicInfo,
 } from "@shared/schema";
 
-const sql_connection = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql_connection);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const db = drizzle(pool);
 
 export interface IStorage {
   // User management
