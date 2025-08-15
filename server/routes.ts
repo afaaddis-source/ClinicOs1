@@ -4,7 +4,7 @@ import multer from "multer";
 import type { Request as MulterRequest } from "express";
 import path from "path";
 import fs from "fs";
-import { storage } from "./storage";
+import { storage } from "./prisma-storage";
 import {
   insertUserSchema,
   insertPatientSchema,
