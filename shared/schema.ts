@@ -24,7 +24,7 @@ export const genderEnum = pgEnum("gender", ["MALE", "FEMALE"]);
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  passwordHash: text("password_hash").notNull(),
   email: text("email").unique(),
   fullName: text("full_name").notNull(),
   role: userRoleEnum("role").notNull().default("RECEPTION"),
@@ -325,8 +325,13 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
+  passwordHash: true,
   createdAt: true,
   updatedAt: true
+}).extend({
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  fullName: z.string().min(2, "Full name must be at least 2 characters")
 });
 
 export const insertPatientSchema = createInsertSchema(patients).omit({

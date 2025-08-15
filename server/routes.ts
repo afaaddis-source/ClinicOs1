@@ -5,17 +5,35 @@ import type { Request as MulterRequest } from "express";
 import path from "path";
 import fs from "fs";
 import { storage } from "./prisma-storage";
-import {
-  insertUserSchema,
-  insertPatientSchema,
-  insertServiceSchema,
-  insertAppointmentSchema,
-  insertVisitSchema,
-  insertInvoiceSchema,
-  insertPaymentSchema,
-  insertPatientFileSchema,
-} from "@shared/schema";
 import { z } from "zod";
+
+// Validation schemas
+const insertUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email("Invalid email format").optional(),
+  fullName: z.string().min(2, "Full name must be at least 2 characters"),
+  role: z.enum(["ADMIN", "DOCTOR", "RECEPTION", "ACCOUNTANT"]),
+  phone: z.string().optional(),
+  isActive: z.boolean().default(true),
+});
+
+const insertPatientSchema = z.object({
+  civilId: z.string().min(12).max(12).regex(/^\d{12}$/, "Civil ID must be exactly 12 digits"),
+  name: z.string().min(1, "Name is required"),
+  phone: z.string().min(8, "Phone number is required"),
+  dob: z.string().optional(),
+  gender: z.enum(["MALE", "FEMALE"]).optional(),
+  allergies: z.string().optional(),
+});
+
+const insertServiceSchema = z.object({
+  code: z.string().min(1, "Service code is required"),
+  nameAr: z.string().min(1, "Arabic name is required"),
+  nameEn: z.string().min(1, "English name is required"),
+  price: z.number().positive("Price must be positive"),
+  defaultMinutes: z.number().min(5, "Duration must be at least 5 minutes"),
+});
 
 // Session types
 declare module "express-session" {
@@ -272,7 +290,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
     try {
       const userData = insertUserSchema.parse(req.body);
-      const user = await storage.createUser(userData);
+      // Convert to Prisma format
+      const prismaUserData = {
+        username: userData.username,
+        passwordHash: userData.password, // Will be hashed in storage
+        role: userData.role,
+        fullName: userData.fullName,
+        email: userData.email,
+        phone: userData.phone,
+        isActive: userData.isActive
+      };
+      const user = await storage.createUser(prismaUserData);
       
       await storage.createAuditLog({
         userId: req.session.user?.id,
@@ -297,8 +325,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/users/:id", requireAuth, requireRole(["ADMIN"]), async (req: Request, res: Response) => {
     try {
       const userData = insertUserSchema.partial().parse(req.body);
+      // Convert to Prisma format for updates
+      const prismaUpdateData: any = {};
+      if (userData.username) prismaUpdateData.username = userData.username;
+      if (userData.password) prismaUpdateData.password = userData.password;
+      if (userData.role) prismaUpdateData.role = userData.role;
+      if (userData.fullName) prismaUpdateData.fullName = userData.fullName;
+      if (userData.email !== undefined) prismaUpdateData.email = userData.email;
+      if (userData.phone !== undefined) prismaUpdateData.phone = userData.phone;
+      if (userData.isActive !== undefined) prismaUpdateData.isActive = userData.isActive;
       const oldUser = await storage.getUser(req.params.id);
-      const user = await storage.updateUser(req.params.id, userData);
+      const user = await storage.updateUser(req.params.id, prismaUpdateData);
       
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -421,6 +458,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/patients", requireAuth, requireRole(["ADMIN", "RECEPTION"]), async (req: Request, res: Response) => {
     try {
       const patientData = insertPatientSchema.parse(req.body);
+      // Convert to Prisma format
+      const prismaPatientData = {
+        civilId: patientData.civilId,
+        name: patientData.name,
+        phone: patientData.phone,
+        dob: patientData.dob ? new Date(patientData.dob) : null,
+        gender: patientData.gender,
+        allergies: patientData.allergies
+      };
       
       // Check if civil ID already exists
       const existingPatient = await storage.getPatientByCivilId(patientData.civilId);
@@ -428,7 +474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Patient with this Civil ID already exists" });
       }
       
-      const patient = await storage.createPatient(patientData);
+      const patient = await storage.createPatient(prismaPatientData);
       
       await storage.createAuditLog({
         userId: req.session.user?.id,
