@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
+import MemoryStore from "memorystore";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import csrf from "csurf";
@@ -25,13 +25,11 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration with PostgreSQL store
-const PgSession = connectPgSimple(session);
+// Session configuration with Memory store
+const MemStore = MemoryStore(session);
 app.use(session({
-  store: new PgSession({
-    conString: process.env.DATABASE_URL,
-    tableName: "session",
-    createTableIfMissing: true,
+  store: new MemStore({
+    checkPeriod: 86400000, // prune expired entries every 24h
   }),
   secret: process.env.SESSION_SECRET || "clinicos-development-secret-change-in-production",
   resave: false,
@@ -119,7 +117,6 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after
