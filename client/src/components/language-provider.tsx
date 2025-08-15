@@ -122,30 +122,7 @@ export const LanguageToggle: React.FC = () => {
   return (
     <button
       onClick={toggleLanguage}
-      className="language-toggle-btn w-full"
-      style={{
-        padding: '0.5rem 1rem',
-        borderRadius: '8px',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        color: 'rgba(255, 255, 255, 0.9)',
-        background: 'rgba(255, 255, 255, 0.1)',
-        fontSize: '0.875rem',
-        fontWeight: '500',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        justifyContent: 'center'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-        e.currentTarget.style.transform = 'translateY(-1px)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-        e.currentTarget.style.transform = 'translateY(0)';
-      }}
+      className="language-toggle-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md"
       aria-label={t('nav.language')}
     >
       <span style={{ fontSize: '1.1rem' }}>
