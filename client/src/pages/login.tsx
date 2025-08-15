@@ -161,10 +161,10 @@ export default function LoginPage() {
                     {isArabic ? 'حسابات التجربة:' : 'Demo Accounts:'}
                   </p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>admin/admin123</div>
-                    <div>doctor/doctor123</div>
-                    <div>reception/reception123</div>
-                    <div>accountant/accountant123</div>
+                    <div>admin/123456</div>
+                    <div>doctor/123456</div>
+                    <div>reception/123456</div>
+                    <div>accountant/123456</div>
                   </div>
                 </div>
               </AlertDescription>
