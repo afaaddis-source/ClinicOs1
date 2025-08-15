@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-auth";
 import { useLanguage, LanguageToggle } from "@/components/language-provider";
-import { LogIn, Loader2, Languages, AlertCircle } from "lucide-react";
+import { LogIn, Loader2, Languages, AlertCircle, Shield } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -179,6 +179,77 @@ export default function LoginPage() {
                 </AlertDescription>
               </Alert>
             )}
+
+            {/* Quick Login Buttons */}
+            <div className="mb-4">
+              <p className="text-sm font-medium mb-3 text-center">
+                {isArabic ? 'تسجيل دخول سريع:' : 'Quick Login:'}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    form.setValue('username', 'admin');
+                    form.setValue('password', '123456');
+                    form.handleSubmit(onSubmit)();
+                  }}
+                  data-testid="quick-login-admin"
+                >
+                  <Shield className="h-4 w-4 mr-1" />
+                  {isArabic ? 'إداري' : 'Admin'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    form.setValue('username', 'doctor');
+                    form.setValue('password', '123456');
+                    form.handleSubmit(onSubmit)();
+                  }}
+                  data-testid="quick-login-doctor"
+                >
+                  <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                  {isArabic ? 'طبيب' : 'Doctor'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    form.setValue('username', 'reception');
+                    form.setValue('password', '123456');
+                    form.handleSubmit(onSubmit)();
+                  }}
+                  data-testid="quick-login-reception"
+                >
+                  <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  {isArabic ? 'استقبال' : 'Reception'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    form.setValue('username', 'accountant');
+                    form.setValue('password', '123456');
+                    form.handleSubmit(onSubmit)();
+                  }}
+                  data-testid="quick-login-accountant"
+                >
+                  <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {isArabic ? 'محاسب' : 'Accountant'}
+                </Button>
+              </div>
+            </div>
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

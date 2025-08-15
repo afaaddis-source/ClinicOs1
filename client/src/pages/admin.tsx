@@ -117,8 +117,10 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("services");
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [settingDialogOpen, setSettingDialogOpen] = useState(false);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [editingSetting, setEditingSetting] = useState<Setting | null>(null);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
 
   // Check if current user is admin
   if (currentUser?.role !== 'ADMIN') {
@@ -142,6 +144,10 @@ export default function AdminPage() {
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["/api/admin/settings"],
+  });
+
+  const { data: users, isLoading: usersLoading } = useQuery({
+    queryKey: ["/api/users"],
   });
 
   const { data: clinicInfo } = useQuery({
@@ -203,6 +209,19 @@ export default function AdminPage() {
     },
   });
 
+  const userForm = useForm({
+    resolver: zodResolver(userSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      email: "",
+      fullName: "",
+      role: "RECEPTION",
+      phone: "",
+      isActive: true,
+    },
+  });
+
   // Mutations
   const createServiceMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -257,6 +276,57 @@ export default function AdminPage() {
         title: isArabic ? "خطأ" : "Error",
         description: error.message,
         variant: "destructive",
+      });
+    },
+  });
+
+  // User mutations
+  const createUserMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("/api/users", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setUserDialogOpen(false);
+      setEditingUser(null);
+      userForm.reset();
+      toast({
+        title: isArabic ? "تم إنشاء المستخدم بنجاح" : "User created successfully",
+      });
+    },
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return await apiRequest(`/api/users/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setUserDialogOpen(false);
+      setEditingUser(null);
+      userForm.reset();
+      toast({
+        title: isArabic ? "تم تحديث المستخدم بنجاح" : "User updated successfully",
+      });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/users/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: isArabic ? "تم حذف المستخدم بنجاح" : "User deleted successfully",
       });
     },
   });
@@ -322,7 +392,7 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="services" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             {isArabic ? 'الخدمات' : 'Services'}
@@ -334,6 +404,10 @@ export default function AdminPage() {
           <TabsTrigger value="reports" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             {isArabic ? 'التقارير' : 'Reports'}
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            {isArabic ? 'المستخدمون' : 'Users'}
           </TabsTrigger>
           <TabsTrigger value="backup" className="flex items-center gap-2">
             <Download className="h-4 w-4" />
@@ -686,6 +760,248 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Users Tab */}
+        <TabsContent value="users" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">
+              {isArabic ? 'إدارة المستخدمين' : 'User Management'}
+            </h2>
+            <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => {
+                  setEditingUser(null);
+                  userForm.reset();
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {isArabic ? 'إضافة مستخدم' : 'Add User'}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingUser 
+                      ? (isArabic ? 'تعديل مستخدم' : 'Edit User')
+                      : (isArabic ? 'إضافة مستخدم جديد' : 'Add New User')
+                    }
+                  </DialogTitle>
+                </DialogHeader>
+                <Form {...userForm}>
+                  <form onSubmit={userForm.handleSubmit((data) => {
+                    if (editingUser) {
+                      updateUserMutation.mutate({ id: editingUser.id, data });
+                    } else {
+                      createUserMutation.mutate(data);
+                    }
+                  })} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={userForm.control}
+                        name="username"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'اسم المستخدم' : 'Username'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={userForm.control}
+                        name="fullName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'الاسم الكامل' : 'Full Name'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={userForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{isArabic ? 'كلمة المرور' : 'Password'}</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={userForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'البريد الإلكتروني' : 'Email'}</FormLabel>
+                            <FormControl>
+                              <Input type="email" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={userForm.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{isArabic ? 'الهاتف' : 'Phone'}</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={userForm.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{isArabic ? 'الدور' : 'Role'}</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="ADMIN">{isArabic ? 'مدير' : 'Admin'}</SelectItem>
+                              <SelectItem value="DOCTOR">{isArabic ? 'طبيب' : 'Doctor'}</SelectItem>
+                              <SelectItem value="RECEPTION">{isArabic ? 'استقبال' : 'Reception'}</SelectItem>
+                              <SelectItem value="ACCOUNTANT">{isArabic ? 'محاسب' : 'Accountant'}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={userForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">
+                              {isArabic ? 'نشط' : 'Active'}
+                            </FormLabel>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button type="submit" disabled={createUserMutation.isPending || updateUserMutation.isPending}>
+                        {(createUserMutation.isPending || updateUserMutation.isPending) && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        {editingUser 
+                          ? (isArabic ? 'تحديث' : 'Update')
+                          : (isArabic ? 'إضافة' : 'Add')
+                        }
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{isArabic ? 'قائمة المستخدمين' : 'Users List'}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {usersLoading ? (
+                <div className="flex justify-center p-4">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{isArabic ? 'اسم المستخدم' : 'Username'}</TableHead>
+                      <TableHead>{isArabic ? 'الاسم الكامل' : 'Full Name'}</TableHead>
+                      <TableHead>{isArabic ? 'الدور' : 'Role'}</TableHead>
+                      <TableHead>{isArabic ? 'الحالة' : 'Status'}</TableHead>
+                      <TableHead className="text-right">{isArabic ? 'الإجراءات' : 'Actions'}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users?.map((user: any) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.username}</TableCell>
+                        <TableCell>{user.fullName || user.username}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            user.role === 'ADMIN' ? 'default' :
+                            user.role === 'DOCTOR' ? 'secondary' :
+                            user.role === 'RECEPTION' ? 'outline' : 'destructive'
+                          }>
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                            {user.isActive ? (isArabic ? 'نشط' : 'Active') : (isArabic ? 'غير نشط' : 'Inactive')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingUser(user);
+                                userForm.reset({
+                                  username: user.username,
+                                  email: user.email || '',
+                                  fullName: user.fullName || user.username,
+                                  role: user.role,
+                                  phone: user.phone || '',
+                                  isActive: user.isActive ?? true,
+                                  password: '', // Don't prefill password
+                                });
+                                setUserDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {user.id !== currentUser?.id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deleteUserMutation.mutate(user.id)}
+                                disabled={deleteUserMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Reports Tab */}
