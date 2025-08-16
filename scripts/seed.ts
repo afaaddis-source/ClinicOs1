@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import bcrypt from "bcrypt";
+import bcryptjs from "bcryptjs";
 import {
   users,
   patients,
@@ -35,10 +35,10 @@ async function seed() {
 
     // Create users
     console.log("👥 Creating users...");
-    const hashedPassword = await bcrypt.hash("admin123", 12);
-    const doctorPassword = await bcrypt.hash("doctor123", 12);
-    const receptionPassword = await bcrypt.hash("reception123", 12);
-    const accountantPassword = await bcrypt.hash("accountant123", 12);
+    const hashedPassword = await bcryptjs.hash("admin123", 12);
+    const doctorPassword = await bcryptjs.hash("doctor123", 12);
+    const receptionPassword = await bcryptjs.hash("reception123", 12);
+    const accountantPassword = await bcryptjs.hash("accountant123", 12);
 
     const createdUsers = await db.insert(users).values([
       {

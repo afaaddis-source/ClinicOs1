@@ -1,0 +1,64 @@
+You are an AI Software Engineer. Patch the existing ClinicOS (Node/Express + Prisma + SQLite) repo for reliable deploy on Render:
+
+1) SERVER: trust proxy + hardened session
+- In server.ts (or server.js) add near the top:
+  import session from 'express-session';
+  import helmet from 'helmet';
+  app.set('trust proxy', 1); // REQUIRED for secure cookies on Render
+  app.use(helmet());
+
+- Replace current session() with:
+  const sessionSecret = process.env.SESSION_SECRET || 'dev-secret';
+  app.use(session({
+    name: 'clinicos.sid',
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 1000 * 60 * 60 * 8 // 8h
+    }
+  }));
+
+- Ensure CSRF middleware is still applied after session, and every form has the hidden _csrf input.
+
+2) HEALTH CHECK & DEBUG
+- Add GET "/__healthz" that returns { ok:true, db:true, users: <count> } after a simple prisma.user.count().
+- Protect "/__debug/users" behind a token: only respond if req.query.token === process.env.DEBUG_TOKEN, and return a small list of usernames/roles.
+
+3) PRISMA CONFIG (SQLite on Render)
+- In prisma/schema.prisma ensure:
+  datasource db {
+    provider = "sqlite"
+    url      = env("DATABASE_URL")
+  }
+- Create a helper util that logs the effective DATABASE_URL on boot.
+
+4) BOOTSTRAP ADMIN ON FIRST RUN
+- Create src/bootstrapAdmin.ts:
+  If no user with role ADMIN exists, create one using:
+    username = process.env.BOOTSTRAP_ADMIN_USER || 'admin'
+    password = process.env.BOOTSTRAP_ADMIN_PASSWORD (required to proceed; if missing, log a warning and skip)
+  Hash with bcryptjs, role = 'ADMIN'.
+- Import and call bootstrapAdmin() once after Prisma connects.
+
+5) STARTUP MIGRATIONS/SEED
+- Add npm scripts in package.json:
+  "migrate:deploy": "prisma migrate deploy || prisma db push",
+  "seed": "prisma db seed",
+  "start:render": "npm run migrate:deploy && node dist/server.js || node src/server.js"
+  (keep existing dev script)
+- Ensure prisma/seed.ts exists and creates the 4 demo users *only if absent*.
+
+6) BCRYPT CONSISTENCY
+- Use **bcryptjs** everywhere (login compare & seed) to avoid native build issues on Render. Ensure package.json depends on bcryptjs and the auth code imports bcryptjs.
+
+7) SLOT TIMEZONE
+- Optional but recommended: use dayjs + timezone('Asia/Kuwait') for all date formatting.
+
+ACCEPTANCE:
+- /__healthz returns ok:true and users>=1 on Render.
+- If DB was empty, bootstrapAdmin creates Admin when BOOTSTRAP_ADMIN_PASSWORD is set.
+- After login, response sets cookie "clinicos.sid" (check dev tools) and redirects to /dashboard staying logged in.

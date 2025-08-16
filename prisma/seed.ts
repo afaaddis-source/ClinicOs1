@@ -1,13 +1,20 @@
 import { PrismaClient, Role, Gender, AppointmentStatus } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting seed...');
 
+  // Check if users already exist
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0) {
+    console.log('👥 Users already exist, skipping seed');
+    return;
+  }
+
   // Create users
-  const adminPassword = await bcrypt.hash('123456', 12);
+  const adminPassword = await bcryptjs.hash('123456', 12);
   const admin = await prisma.user.create({
     data: {
       username: 'admin',
@@ -16,7 +23,7 @@ async function main() {
     },
   });
 
-  const receptionPassword = await bcrypt.hash('123456', 12);
+  const receptionPassword = await bcryptjs.hash('123456', 12);
   const reception = await prisma.user.create({
     data: {
       username: 'reception',
@@ -25,7 +32,7 @@ async function main() {
     },
   });
 
-  const doctorPassword = await bcrypt.hash('123456', 12);
+  const doctorPassword = await bcryptjs.hash('123456', 12);
   const doctor = await prisma.user.create({
     data: {
       username: 'doctor',
@@ -34,7 +41,7 @@ async function main() {
     },
   });
 
-  const accountantPassword = await bcrypt.hash('123456', 12);
+  const accountantPassword = await bcryptjs.hash('123456', 12);
   const accountant = await prisma.user.create({
     data: {
       username: 'accountant',

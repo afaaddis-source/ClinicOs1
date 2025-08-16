@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 
 export const authController = {
@@ -18,7 +18,7 @@ export const authController = {
         where: { username }
       });
 
-      if (!user || !await bcrypt.compare(password, user.passwordHash)) {
+      if (!user || !await bcryptjs.compare(password, user.passwordHash)) {
         return res.render('auth/login', {
           title: req.t('auth.login_title'),
           error: req.t('auth.invalid_credentials')

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 
 export const adminController = {
@@ -33,7 +33,7 @@ export const adminController = {
     try {
       const { username, password, role } = req.body;
       
-      const passwordHash = await bcrypt.hash(password, 12);
+      const passwordHash = await bcryptjs.hash(password, 12);
       
       const user = await prisma.user.create({
         data: {

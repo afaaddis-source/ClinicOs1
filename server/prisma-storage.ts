@@ -1,5 +1,5 @@
 import { PrismaClient, Role } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -135,7 +135,7 @@ export class PrismaStorage implements IStorage {
   }
 
   async createUser(user: any): Promise<any> {
-    const hashedPassword = await bcrypt.hash(user.password, 12);
+    const hashedPassword = await bcryptjs.hash(user.password, 12);
     return await prisma.user.create({
       data: {
         ...user,
@@ -147,7 +147,7 @@ export class PrismaStorage implements IStorage {
   async updateUser(id: string, user: Partial<any>): Promise<any | undefined> {
     const updateData: any = { ...user };
     if (updateData.password) {
-      updateData.passwordHash = await bcrypt.hash(updateData.password, 12);
+      updateData.passwordHash = await bcryptjs.hash(updateData.password, 12);
       delete updateData.password;
     }
     
@@ -189,7 +189,7 @@ export class PrismaStorage implements IStorage {
     }
     
     console.log("Comparing password for user:", user.username);
-    const isValid = await bcrypt.compare(password, user.passwordHash);
+    const isValid = await bcryptjs.compare(password, user.passwordHash);
     console.log("Password comparison result:", isValid);
     
     return isValid ? { ...user, fullName: user.username, isActive: true } : undefined;

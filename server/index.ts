@@ -6,8 +6,13 @@ import cookieParser from "cookie-parser";
 import csrf from "csurf";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { bootstrapAdmin } from "../src/bootstrapAdmin.js";
+import { logDatabaseUrl } from "../src/lib/dbLogger.js";
 
 const app = express();
+
+// Trust proxy for secure cookies on Render
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet({
@@ -34,11 +39,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET || "clinicos-development-secret-change-in-production",
   resave: false,
   saveUninitialized: false,
+  name: 'clinicos.sid',
   cookie: {
-    secure: process.env.NODE_ENV === "production",
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: "strict",
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 1000 * 60 * 60 * 8 // 8h
   },
 }));
 
@@ -79,6 +85,37 @@ app.get('/api/csrf-token', (req, res) => {
   res.json({ csrfToken: req.csrfToken?.() || 'test-token' });
 });
 
+// Health check endpoint
+app.get('/__healthz', async (req, res) => {
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    const userCount = await prisma.user.count();
+    await prisma.$disconnect();
+    res.json({ ok: true, db: true, users: userCount });
+  } catch (error) {
+    res.status(500).json({ ok: false, db: false, error: 'Database connection failed' });
+  }
+});
+
+// Debug endpoint (protected by token)
+app.get('/__debug/users', async (req, res) => {
+  if (req.query.token !== process.env.DEBUG_TOKEN) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    const users = await prisma.user.findMany({
+      select: { username: true, role: true }
+    });
+    await prisma.$disconnect();
+    res.json({ users });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -110,6 +147,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Log database configuration
+  logDatabaseUrl();
+  
+  // Bootstrap admin user if needed
+  await bootstrapAdmin();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

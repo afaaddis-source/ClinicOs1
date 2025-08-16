@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { eq, and, like, desc, gte, lte, sql } from "drizzle-orm";
-import bcrypt from "bcrypt";
+import bcryptjs from "bcryptjs";
 import {
   users,
   patients,
@@ -190,7 +190,7 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const hashedPassword = await bcrypt.hash(user.password, 12);
+    const hashedPassword = await bcryptjs.hash(user.password, 12);
     const result = await db.insert(users).values({
       ...user,
       password: hashedPassword,
@@ -201,7 +201,7 @@ export class PostgreSQLStorage implements IStorage {
   async updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined> {
     const updateData: any = { ...user };
     if (updateData.password) {
-      updateData.password = await bcrypt.hash(updateData.password, 12);
+      updateData.password = await bcryptjs.hash(updateData.password, 12);
     }
     updateData.updatedAt = new Date();
     
@@ -230,7 +230,7 @@ export class PostgreSQLStorage implements IStorage {
     }
     
     console.log("Comparing password for user:", user.username);
-    const isValid = await bcrypt.compare(password, user.password);
+    const isValid = await bcryptjs.compare(password, user.password);
     console.log("Password comparison result:", isValid);
     
     return isValid ? user : undefined;
