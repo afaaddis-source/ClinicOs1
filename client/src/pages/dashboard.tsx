@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, memo, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,14 +32,14 @@ interface DashboardStats {
   pendingPayments: number;
 }
 
-export default function DashboardPage() {
+const DashboardPage = memo(function DashboardPage() {
   const { language, t, isRTL } = useLanguage();
   const { user } = useUser();
   const isMobile = useIsMobile();
   const isArabic = language === 'ar';
 
-  // Get role-based dashboard configuration
-  const getRoleDashboardConfig = () => {
+  // Get role-based dashboard configuration (memoized)
+  const getRoleDashboardConfig = useMemo(() => {
     switch (user?.role) {
       case 'DOCTOR':
         return {
@@ -83,9 +83,9 @@ export default function DashboardPage() {
           ]
         };
     }
-  };
+  }, [user?.role, isArabic]);
 
-  const dashboardConfig = getRoleDashboardConfig();
+  const dashboardConfig = getRoleDashboardConfig;
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
@@ -193,8 +193,11 @@ export default function DashboardPage() {
     },
   };
 
-  // Filter stats cards based on user role
-  const statsCards = dashboardConfig.stats.map(statKey => allStatsCards[statKey as keyof typeof allStatsCards]).filter(Boolean);
+  // Filter stats cards based on user role (memoized)
+  const statsCards = useMemo(() => 
+    dashboardConfig.stats.map(statKey => allStatsCards[statKey as keyof typeof allStatsCards]).filter(Boolean),
+    [dashboardConfig.stats, stats, isArabic]
+  );
 
   if (isLoading) {
     return (
@@ -578,4 +581,6 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
+});
+
+export default DashboardPage;

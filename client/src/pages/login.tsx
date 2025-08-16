@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, memo, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+const LoginPage = memo(function LoginPage() {
   const { language, t, isRTL } = useLanguage();
   const { toast } = useToast();
   const { user } = useUser();
@@ -113,10 +113,10 @@ export default function LoginPage() {
     },
   });
 
-  const onSubmit = (data: LoginFormData) => {
+  const onSubmit = useCallback((data: LoginFormData) => {
     setErrorMessage(''); // Clear any previous error message
     loginMutation.mutate(data);
-  };
+  }, [loginMutation]);
 
 
 
@@ -334,4 +334,6 @@ export default function LoginPage() {
       </div>
     </div>
   );
-}
+});
+
+export default LoginPage;

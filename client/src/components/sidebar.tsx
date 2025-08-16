@@ -17,9 +17,9 @@ import {
 import { useUser, useLogout } from "@/hooks/use-auth";
 import { useLanguage, LanguageToggle } from "@/components/language-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useState } from "react";
+import { useState, memo, useMemo, useCallback } from "react";
 
-export default function Sidebar() {
+const Sidebar = memo(function Sidebar() {
   const [location] = useLocation();
   const { t, language, isRTL } = useLanguage();
   const { user } = useUser();
@@ -27,8 +27,8 @@ export default function Sidebar() {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Define role-based navigation items
-  const getRoleBasedNavigation = () => {
+  // Define role-based navigation items (memoized)
+  const getRoleBasedNavigation = useMemo(() => {
     const allNavItems = [
       {
         name: language === 'ar' ? 'لوحة التحكم' : t('nav.dashboard'),
@@ -71,9 +71,9 @@ export default function Sidebar() {
     return allNavItems.filter(item => 
       !user?.role || item.roles.includes(user.role)
     );
-  };
+  }, [user?.role, language, location]);
 
-  const navigation = getRoleBasedNavigation();
+  const navigation = getRoleBasedNavigation;
 
   // Add admin section for admin users
   if (user?.role === 'ADMIN') {
@@ -86,11 +86,14 @@ export default function Sidebar() {
     });
   }
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout.mutate();
-  };
+  }, [logout]);
 
-  const userRoleTranslation = user?.role ? t(`roles.${user.role.toLowerCase()}`) : '';
+  const userRoleTranslation = useMemo(() => 
+    user?.role ? t(`roles.${user.role.toLowerCase()}`) : '',
+    [user?.role, t]
+  );
 
   const SidebarContent = () => (
     <div className="sidebar flex h-full w-full flex-col" data-testid="sidebar">
@@ -213,4 +216,6 @@ export default function Sidebar() {
       <SidebarContent />
     </div>
   );
-}
+});
+
+export default Sidebar;
