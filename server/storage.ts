@@ -41,6 +41,7 @@ import {
 } from "@shared/schema";
 
 import { db } from "./db";
+import { HARDCODED_USERS, findHardcodedUser, authenticateHardcodedUser, USE_HARDCODED_USERS } from "./hardcoded-users";
 
 export interface IStorage {
   // User management
@@ -182,8 +183,16 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-    return result[0];
+    try {
+      const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+      return result[0];
+    } catch (error) {
+      console.log("Database error, trying hardcoded users:", error);
+      if (USE_HARDCODED_USERS) {
+        return findHardcodedUser(username) as User;
+      }
+      throw error;
+    }
   }
 
   async createUser(user: InsertUser): Promise<User> {
@@ -221,17 +230,25 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async authenticateUser(username: string, password: string): Promise<User | undefined> {
-    const user = await this.getUserByUsername(username);
-    if (!user || !user.isActive) {
-      console.log("User not found or inactive:", { found: !!user, active: user?.isActive });
-      return undefined;
+    try {
+      const user = await this.getUserByUsername(username);
+      if (!user || !user.isActive) {
+        console.log("User not found or inactive:", { found: !!user, active: user?.isActive });
+        return undefined;
+      }
+      
+      console.log("Comparing password for user:", user.username);
+      const isValid = await bcryptjs.compare(password, user.passwordHash);
+      console.log("Password comparison result:", isValid);
+      
+      return isValid ? user : undefined;
+    } catch (error) {
+      console.log("Database authentication error, trying hardcoded users:", error);
+      if (USE_HARDCODED_USERS) {
+        return await authenticateHardcodedUser(username, password) as User;
+      }
+      throw error;
     }
-    
-    console.log("Comparing password for user:", user.username);
-    const isValid = await bcryptjs.compare(password, user.passwordHash);
-    console.log("Password comparison result:", isValid);
-    
-    return isValid ? user : undefined;
   }
 
   // Patient management

@@ -5,6 +5,7 @@ import type { Request as MulterRequest } from "express";
 import path from "path";
 import fs from "fs";
 import { PostgreSQLStorage } from "./storage";
+import { MemoryStorage } from "./memory-storage";
 import { 
   insertUserSchema,
   insertPatientSchema, 
@@ -14,7 +15,11 @@ import {
 } from "../shared/schema";
 import { z } from "zod";
 
-const storage = new PostgreSQLStorage();
+// Use memory storage for deployment without database
+const USE_MEMORY_STORAGE = process.env.USE_MEMORY_STORAGE === 'true' || !process.env.DATABASE_URL;
+const storage = USE_MEMORY_STORAGE ? new MemoryStorage() : new PostgreSQLStorage();
+
+console.log('📦 Storage mode:', USE_MEMORY_STORAGE ? 'IN-MEMORY' : 'DATABASE');
 
 // Validation schemas are imported from shared/schema
 

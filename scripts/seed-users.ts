@@ -8,28 +8,28 @@ async function seedUsers() {
   const defaultUsers = [
     {
       username: 'admin',
-      password: 'admin123',
+      password: '123456',
       fullName: 'System Administrator',
       role: 'ADMIN' as const,
       email: 'admin@clinicos.local'
     },
     {
       username: 'reception',
-      password: 'reception123',
+      password: '123456',
       fullName: 'Reception Staff',
       role: 'RECEPTION' as const,
       email: 'reception@clinicos.local'
     },
     {
       username: 'doctor',
-      password: 'doctor123',
+      password: '123456',
       fullName: 'Dr. Ahmed Al-Mansouri',
       role: 'DOCTOR' as const,
       email: 'doctor@clinicos.local'
     },
     {
       username: 'accountant',
-      password: 'accountant123',
+      password: '123456',
       fullName: 'Accountant Staff',
       role: 'ACCOUNTANT' as const,
       email: 'accountant@clinicos.local'

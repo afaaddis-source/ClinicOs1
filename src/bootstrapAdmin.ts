@@ -14,7 +14,7 @@ export async function bootstrapAdmin() {
     }
 
     const bootstrapUsername = process.env.BOOTSTRAP_ADMIN_USER || 'admin';
-    const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || 'admin123';
+    const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || '123456';
 
     console.log(`ℹ️ Creating admin user: ${bootstrapUsername}`);
 
