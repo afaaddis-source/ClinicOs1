@@ -40,11 +40,7 @@ import {
   type InsertClinicInfo,
 } from "@shared/schema";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const db = drizzle(pool);
+import { db } from "../src/lib/db";
 
 export interface IStorage {
   // User management
@@ -193,7 +189,7 @@ export class PostgreSQLStorage implements IStorage {
     const hashedPassword = await bcryptjs.hash(user.password, 12);
     const result = await db.insert(users).values({
       ...user,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
     }).returning();
     return result[0];
   }
@@ -201,7 +197,8 @@ export class PostgreSQLStorage implements IStorage {
   async updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined> {
     const updateData: any = { ...user };
     if (updateData.password) {
-      updateData.password = await bcryptjs.hash(updateData.password, 12);
+      updateData.passwordHash = await bcryptjs.hash(updateData.password, 12);
+      delete updateData.password; // Remove the plain password field
     }
     updateData.updatedAt = new Date();
     
@@ -211,7 +208,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteUser(id: string): Promise<boolean> {
     const result = await db.delete(users).where(eq(users.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -230,7 +227,7 @@ export class PostgreSQLStorage implements IStorage {
     }
     
     console.log("Comparing password for user:", user.username);
-    const isValid = await bcryptjs.compare(password, user.password);
+    const isValid = await bcryptjs.compare(password, user.passwordHash);
     console.log("Password comparison result:", isValid);
     
     return isValid ? user : undefined;
@@ -260,7 +257,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deletePatient(id: string): Promise<boolean> {
     const result = await db.delete(patients).where(eq(patients.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getAllPatients(): Promise<Patient[]> {
@@ -289,7 +286,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deletePatientFile(id: string): Promise<boolean> {
     const result = await db.delete(patientFiles).where(eq(patientFiles.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getPatientFile(id: string): Promise<PatientFile | undefined> {
@@ -316,7 +313,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteService(id: string): Promise<boolean> {
     const result = await db.delete(services).where(eq(services.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getAllServices(): Promise<Service[]> {
@@ -346,7 +343,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteAppointment(id: string): Promise<boolean> {
     const result = await db.delete(appointments).where(eq(appointments.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getAllAppointments(): Promise<Appointment[]> {
@@ -404,7 +401,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteVisit(id: string): Promise<boolean> {
     const result = await db.delete(visits).where(eq(visits.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getVisitsByPatient(patientId: string): Promise<Visit[]> {
@@ -537,7 +534,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteInvoice(id: string): Promise<boolean> {
     const result = await db.delete(invoices).where(eq(invoices.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getAllInvoices(): Promise<Invoice[]> {
@@ -671,7 +668,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteInvoiceItem(id: string): Promise<boolean> {
     const result = await db.delete(invoiceItems).where(eq(invoiceItems.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Payment management
@@ -692,7 +689,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deletePayment(id: string): Promise<boolean> {
     const result = await db.delete(payments).where(eq(payments.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getPaymentsByInvoice(invoiceId: string): Promise<Payment[]> {
@@ -1000,7 +997,7 @@ export class PostgreSQLStorage implements IStorage {
 
   async deleteSetting(id: string): Promise<boolean> {
     const result = await db.delete(settings).where(eq(settings.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Clinic Info management
