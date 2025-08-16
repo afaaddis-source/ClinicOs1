@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useUser } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DashboardStats {
   totalPatients: number;
@@ -31,6 +32,7 @@ interface DashboardStats {
 export default function DashboardPage() {
   const { language, t, isRTL } = useLanguage();
   const { user } = useUser();
+  const isMobile = useIsMobile();
   const isArabic = language === 'ar';
 
   const { data: stats, isLoading } = useQuery({
@@ -123,16 +125,16 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">
             {isArabic ? 'لوحة التحكم' : 'Dashboard'}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             {isArabic ? 'نظرة عامة على أداء العيادة' : 'Overview of clinic performance'}
           </p>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -151,7 +153,7 @@ export default function DashboardPage() {
 
   // Role-specific dashboard rendering
   const renderAdminDashboard = () => (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       {statsCards.map((stat, index) => {
         const Icon = stat.icon;
         return (
@@ -176,7 +178,7 @@ export default function DashboardPage() {
   );
 
   const renderReceptionDashboard = () => (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>{isArabic ? 'مواعيد اليوم' : "Today's Schedule"}</CardTitle>
@@ -212,10 +214,14 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>{isArabic ? 'رقم الهوية المدنية' : 'Civil ID'}</Label>
-              <div className="flex space-x-2">
-                <Input placeholder={isArabic ? 'أدخل رقم الهوية' : 'Enter Civil ID'} />
-                <Button size="icon">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input 
+                  placeholder={isArabic ? 'أدخل رقم الهوية' : 'Enter Civil ID'} 
+                  className="flex-1"
+                />
+                <Button size={isMobile ? "default" : "icon"} className="w-full sm:w-auto">
                   <Search className="h-4 w-4" />
+                  {isMobile && (isArabic ? ' بحث' : ' Search')}
                 </Button>
               </div>
             </div>
@@ -226,7 +232,7 @@ export default function DashboardPage() {
   );
 
   const renderDoctorDashboard = () => (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>{isArabic ? 'مواعيدي اليوم' : 'My Appointments Today'}</CardTitle>
@@ -280,7 +286,7 @@ export default function DashboardPage() {
   );
 
   const renderAccountantDashboard = () => (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>{isArabic ? 'فواتير اليوم' : "Today's Invoices"}</CardTitle>
@@ -337,12 +343,12 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="p-6" data-testid="dashboard-page">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2" data-testid="text-dashboard-title">
+    <div className="p-4 sm:p-6" data-testid="dashboard-page">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2" data-testid="text-dashboard-title">
           {isArabic ? 'لوحة التحكم' : 'Dashboard'}
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           {user?.role === 'ADMIN' ? (isArabic ? 'نظرة عامة على أداء العيادة' : 'Overview of clinic performance') :
            user?.role === 'DOCTOR' ? (isArabic ? 'مواعيدك وإحصائياتك' : 'Your appointments and statistics') :
            user?.role === 'RECEPTION' ? (isArabic ? 'جدول المواعيد والبحث عن المرضى' : 'Appointment schedule and patient search') :
@@ -356,7 +362,7 @@ export default function DashboardPage() {
       {user?.role === 'DOCTOR' && renderDoctorDashboard()}
       {user?.role === 'ACCOUNTANT' && renderAccountantDashboard()}
 
-      <div className="mt-8 grid gap-6 md:grid-cols-2">
+      <div className="mt-6 sm:mt-8 grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>

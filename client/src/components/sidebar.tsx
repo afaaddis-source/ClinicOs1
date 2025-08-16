@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
@@ -9,16 +10,22 @@ import {
   CreditCard, 
   Settings, 
   LogOut,
-  Globe
+  Globe,
+  Menu,
+  X
 } from "lucide-react";
 import { useUser, useLogout } from "@/hooks/use-auth";
 import { useLanguage, LanguageToggle } from "@/components/language-provider";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useState } from "react";
 
 export default function Sidebar() {
   const [location] = useLocation();
   const { t, language, isRTL } = useLanguage();
   const { user } = useUser();
   const logout = useLogout();
+  const isMobile = useIsMobile();
+  const [isOpen, setIsOpen] = useState(false);
 
   // Force navigation items with Arabic fallbacks
   const navigation = [
@@ -70,8 +77,8 @@ export default function Sidebar() {
 
   const userRoleTranslation = user?.role ? t(`roles.${user.role.toLowerCase()}`) : '';
 
-  return (
-    <div className="sidebar flex h-screen w-64 flex-col" data-testid="sidebar">
+  const SidebarContent = () => (
+    <div className="sidebar flex h-full w-full flex-col" data-testid="sidebar">
       {/* Header */}
       <div className="navbar-brand">
         <div className="flex items-center">
@@ -85,13 +92,21 @@ export default function Sidebar() {
               {t('app.name')}
             </h1>
           </div>
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsOpen(false)}
+              className="text-white hover:bg-white hover:bg-opacity-10 lg:hidden"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
-
-        
         <nav className="space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
@@ -104,6 +119,7 @@ export default function Sidebar() {
                   item.current && "active"
                 )}
                 data-testid={`link-${item.href.slice(1)}`}
+                onClick={() => isMobile && setIsOpen(false)}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
                 <span className="nav-text">{item.name}</span>
@@ -148,6 +164,38 @@ export default function Sidebar() {
           {t('nav.logout')}
         </Button>
       </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        {/* Mobile Menu Button */}
+        <div className="fixed top-4 left-4 z-50 lg:hidden">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setIsOpen(true)}
+            className="bg-white shadow-lg"
+            data-testid="button-mobile-menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Mobile Sheet */}
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+          <SheetContent side={isRTL ? "right" : "left"} className="p-0 w-64">
+            <SidebarContent />
+          </SheetContent>
+        </Sheet>
+      </>
+    );
+  }
+
+  return (
+    <div className="w-64 hidden lg:flex">
+      <SidebarContent />
     </div>
   );
 }

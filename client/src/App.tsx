@@ -15,10 +15,12 @@ import AdminPage from "@/pages/admin";
 import Sidebar from "@/components/sidebar";
 import { useUser } from "@/hooks/use-auth";
 import { LanguageProvider, useLanguage } from "@/components/language-provider";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function AppContent() {
   const { user, isLoading } = useUser();
   const { t, isRTL } = useLanguage();
+  const isMobile = useIsMobile();
 
   if (isLoading) {
     return (
@@ -40,7 +42,7 @@ function AppContent() {
   return (
     <div className={`min-h-screen bg-background flex ${isRTL ? 'rtl' : 'ltr'}`}>
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className={`flex-1 overflow-auto ${isMobile ? 'pt-16' : ''}`}>
         <Switch>
           <Route path="/" component={DashboardPage} />
           <Route path="/dashboard" component={DashboardPage} />
