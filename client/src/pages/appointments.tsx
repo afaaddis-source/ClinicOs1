@@ -131,6 +131,7 @@ export default function AppointmentsPage() {
   const [isPatientDialogOpen, setIsPatientDialogOpen] = useState(false);
   const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Forms
   const appointmentForm = useForm<AppointmentFormData>({
@@ -1277,7 +1278,7 @@ export default function AppointmentsPage() {
                   <SelectItem value="all">{isArabic ? "جميع الخدمات" : "All Services"}</SelectItem>
                   {services.map((service: Service) => (
                     <SelectItem key={service.id} value={service.id}>
-                      {service.name}
+                      {isArabic ? service.nameAr : service.nameEn}
                     </SelectItem>
                   ))}
                 </SelectContent>
