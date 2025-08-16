@@ -35,15 +35,15 @@ async function seed() {
 
     // Create users
     console.log("👥 Creating users...");
-    const hashedPassword = await bcryptjs.hash("admin123", 12);
-    const doctorPassword = await bcryptjs.hash("doctor123", 12);
-    const receptionPassword = await bcryptjs.hash("reception123", 12);
-    const accountantPassword = await bcryptjs.hash("accountant123", 12);
+    const hashedPassword = await bcryptjs.hash("123456", 12);
+    const doctorPassword = await bcryptjs.hash("123456", 12);
+    const receptionPassword = await bcryptjs.hash("123456", 12);
+    const accountantPassword = await bcryptjs.hash("123456", 12);
 
     const createdUsers = await db.insert(users).values([
       {
         username: "admin",
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         email: "admin@clinicos.com",
         fullName: "مدير النظام",
         role: "ADMIN",
@@ -52,7 +52,7 @@ async function seed() {
       },
       {
         username: "doctor",
-        password: doctorPassword,
+        passwordHash: doctorPassword,
         email: "doctor@clinicos.com",
         fullName: "د. أحمد محمد",
         role: "DOCTOR",
@@ -61,7 +61,7 @@ async function seed() {
       },
       {
         username: "reception",
-        password: receptionPassword,
+        passwordHash: receptionPassword,
         email: "reception@clinicos.com",
         fullName: "سارة أحمد",
         role: "RECEPTION",
@@ -70,7 +70,7 @@ async function seed() {
       },
       {
         username: "accountant",
-        password: accountantPassword,
+        passwordHash: accountantPassword,
         email: "accountant@clinicos.com",
         fullName: "محمد علي",
         role: "ACCOUNTANT",
@@ -263,24 +263,22 @@ async function seed() {
         visitDate: yesterday,
         chiefComplaint: "ألم في الضرس الخلفي",
         diagnosis: "تسوس في الضرس السفلي الأيسر",
-        treatment: "حشو مؤقت وصف مسكن للألم",
-        prescriptions: [
+        proceduresJson: [
           {
-            medication: "ايبوبروفين 400mg",
-            dosage: "حبة كل 8 ساعات",
-            duration: "3 أيام",
-            instructions: "مع الطعام"
+            serviceId: createdServices[0].id,
+            tooth: "36",
+            surfaces: ["occlusal"],
+            notes: "حشو مؤقت"
           }
         ],
-        procedures: ["فحص سريري", "أشعة"],
-        teethChart: {
+        toothMapJson: {
           "tooth-36": {
             condition: "decayed",
             treatment: "temporary_filling",
             notes: "يحتاج حشو دائم"
           }
         },
-        notes: "المريض يحتاج لزيارة متابعة خلال أسبوع",
+        doctorNotes: "المريض يحتاج لزيارة متابعة خلال أسبوع، وصف مسكن ايبوبروفين 400mg",
         followUpDate: new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000),
         status: "COMPLETED",
         totalAmount: "50.000",
