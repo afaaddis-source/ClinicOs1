@@ -357,10 +357,10 @@ async function seed() {
 
     console.log("✅ Database seeded successfully!");
     console.log("🔑 Login credentials:");
-    console.log("  Admin: admin / admin123");
-    console.log("  Doctor: doctor / doctor123");
-    console.log("  Reception: reception / reception123");
-    console.log("  Accountant: accountant / accountant123");
+    console.log("  Admin: admin / 123456");
+    console.log("  Doctor: doctor / 123456");
+    console.log("  Reception: reception / 123456");
+    console.log("  Accountant: accountant / 123456");
 
   } catch (error) {
     console.error("❌ Error seeding database:", error);
