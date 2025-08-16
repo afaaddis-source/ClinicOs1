@@ -27,39 +27,53 @@ export default function Sidebar() {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Force navigation items with Arabic fallbacks
-  const navigation = [
-    {
-      name: language === 'ar' ? 'لوحة التحكم' : t('nav.dashboard'),
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      current: location === '/' || location === '/dashboard',
-    },
-    {
-      name: language === 'ar' ? 'المرضى' : t('nav.patients'),
-      href: '/patients',
-      icon: Users,
-      current: location === '/patients',
-    },
-    {
-      name: language === 'ar' ? 'المواعيد' : t('nav.appointments'),
-      href: '/appointments',
-      icon: Calendar,
-      current: location === '/appointments',
-    },
-    {
-      name: language === 'ar' ? 'الزيارات' : t('nav.visits'),
-      href: '/visits',
-      icon: Stethoscope,
-      current: location === '/visits',
-    },
-    {
-      name: language === 'ar' ? 'الفواتير' : t('nav.billing'),
-      href: '/billing',
-      icon: CreditCard,
-      current: location === '/billing',
-    },
-  ];
+  // Define role-based navigation items
+  const getRoleBasedNavigation = () => {
+    const allNavItems = [
+      {
+        name: language === 'ar' ? 'لوحة التحكم' : t('nav.dashboard'),
+        href: '/dashboard',
+        icon: LayoutDashboard,
+        current: location === '/' || location === '/dashboard',
+        roles: ['ADMIN', 'DOCTOR', 'RECEPTION', 'ACCOUNTANT'],
+      },
+      {
+        name: language === 'ar' ? 'المرضى' : t('nav.patients'),
+        href: '/patients',
+        icon: Users,
+        current: location === '/patients',
+        roles: ['ADMIN', 'DOCTOR', 'RECEPTION'], // Accountants have limited patient access
+      },
+      {
+        name: language === 'ar' ? 'المواعيد' : t('nav.appointments'),
+        href: '/appointments',
+        icon: Calendar,
+        current: location === '/appointments',
+        roles: ['ADMIN', 'DOCTOR', 'RECEPTION'], // Accountants don't manage appointments
+      },
+      {
+        name: language === 'ar' ? 'الزيارات' : t('nav.visits'),
+        href: '/visits',
+        icon: Stethoscope,
+        current: location === '/visits',
+        roles: ['ADMIN', 'DOCTOR'], // Only medical staff handle visits
+      },
+      {
+        name: language === 'ar' ? 'الفواتير' : t('nav.billing'),
+        href: '/billing',
+        icon: CreditCard,
+        current: location === '/billing',
+        roles: ['ADMIN', 'ACCOUNTANT', 'RECEPTION'], // Reception can view basic billing
+      },
+    ];
+
+    // Filter navigation based on user role
+    return allNavItems.filter(item => 
+      !user?.role || item.roles.includes(user.role)
+    );
+  };
+
+  const navigation = getRoleBasedNavigation();
 
   // Add admin section for admin users
   if (user?.role === 'ADMIN') {
@@ -68,6 +82,7 @@ export default function Sidebar() {
       href: '/admin',
       icon: Settings,
       current: location === '/admin',
+      roles: ['ADMIN'],
     });
   }
 

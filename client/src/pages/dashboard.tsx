@@ -38,6 +38,55 @@ export default function DashboardPage() {
   const isMobile = useIsMobile();
   const isArabic = language === 'ar';
 
+  // Get role-based dashboard configuration
+  const getRoleDashboardConfig = () => {
+    switch (user?.role) {
+      case 'DOCTOR':
+        return {
+          title: isArabic ? 'لوحة تحكم الطبيب' : 'Doctor Dashboard',
+          stats: ['todayAppointments', 'totalPatients', 'monthlyRevenue'],
+          quickActions: [
+            { name: isArabic ? 'المواعيد اليوم' : 'Today\'s Appointments', href: '/appointments', icon: Calendar },
+            { name: isArabic ? 'إضافة زيارة' : 'Add Visit', href: '/visits', icon: Stethoscope },
+            { name: isArabic ? 'المرضى' : 'Patients', href: '/patients', icon: Users },
+          ]
+        };
+      case 'RECEPTION':
+        return {
+          title: isArabic ? 'لوحة تحكم الاستقبال' : 'Reception Dashboard',
+          stats: ['todayAppointments', 'totalPatients', 'pendingPayments'],
+          quickActions: [
+            { name: isArabic ? 'مواعيد جديدة' : 'New Appointment', href: '/appointments', icon: Plus },
+            { name: isArabic ? 'المرضى' : 'Patients', href: '/patients', icon: Users },
+            { name: isArabic ? 'المدفوعات' : 'Payments', href: '/billing', icon: CreditCard },
+          ]
+        };
+      case 'ACCOUNTANT':
+        return {
+          title: isArabic ? 'لوحة تحكم المحاسب' : 'Accountant Dashboard',
+          stats: ['totalRevenue', 'monthlyRevenue', 'pendingPayments'],
+          quickActions: [
+            { name: isArabic ? 'الفواتير' : 'Invoices', href: '/billing', icon: CreditCard },
+            { name: isArabic ? 'المدفوعات المعلقة' : 'Pending Payments', href: '/billing?tab=pending', icon: AlertTriangle },
+            { name: isArabic ? 'التقارير' : 'Reports', href: '/admin?tab=reports', icon: LayoutDashboard },
+          ]
+        };
+      default: // ADMIN
+        return {
+          title: isArabic ? 'لوحة تحكم المدير' : 'Admin Dashboard',
+          stats: ['totalPatients', 'totalAppointments', 'totalRevenue', 'monthlyRevenue'],
+          quickActions: [
+            { name: isArabic ? 'المرضى' : 'Patients', href: '/patients', icon: Users },
+            { name: isArabic ? 'المواعيد' : 'Appointments', href: '/appointments', icon: Calendar },
+            { name: isArabic ? 'الفواتير' : 'Billing', href: '/billing', icon: CreditCard },
+            { name: isArabic ? 'الإدارة' : 'Administration', href: '/admin', icon: LayoutDashboard },
+          ]
+        };
+    }
+  };
+
+  const dashboardConfig = getRoleDashboardConfig();
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
     queryFn: async (): Promise<DashboardStats> => {
@@ -81,8 +130,8 @@ export default function DashboardPage() {
     return isArabic ? formatted : `KWD ${amount.toFixed(2)}`;
   };
 
-  const statsCards = [
-    {
+  const allStatsCards = {
+    totalPatients: {
       title: isArabic ? 'إجمالي المرضى' : 'Total Patients',
       value: stats?.totalPatients || 0,
       icon: Users,
@@ -92,7 +141,7 @@ export default function DashboardPage() {
       trend: '+12%',
       trendColor: 'text-green-600'
     },
-    {
+    totalAppointments: {
       title: isArabic ? 'إجمالي المواعيد' : 'Total Appointments',
       value: stats?.totalAppointments || 0,
       icon: Calendar,
@@ -102,7 +151,7 @@ export default function DashboardPage() {
       trend: '+8%',
       trendColor: 'text-green-600'
     },
-    {
+    monthlyRevenue: {
       title: isArabic ? 'الإيرادات الشهرية' : 'Monthly Revenue',
       value: formatCurrency(stats?.monthlyRevenue || 0),
       icon: TrendingUp,
@@ -112,7 +161,7 @@ export default function DashboardPage() {
       trend: '+15%',
       trendColor: 'text-green-600'
     },
-    {
+    totalRevenue: {
       title: isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
       value: formatCurrency(stats?.totalRevenue || 0),
       icon: DollarSign,
@@ -122,7 +171,7 @@ export default function DashboardPage() {
       trend: '+22%',
       trendColor: 'text-green-600'
     },
-    {
+    todayAppointments: {
       title: isArabic ? 'مواعيد اليوم' : 'Today\'s Appointments',
       value: stats?.todayAppointments || 0,
       icon: Clock,
@@ -132,7 +181,7 @@ export default function DashboardPage() {
       trend: '6 pending',
       trendColor: 'text-orange-600'
     },
-    {
+    pendingPayments: {
       title: isArabic ? 'المدفوعات المعلقة' : 'Pending Payments',
       value: formatCurrency(stats?.pendingPayments || 0),
       icon: AlertTriangle,
@@ -142,7 +191,10 @@ export default function DashboardPage() {
       trend: '3 overdue',
       trendColor: 'text-red-600'
     },
-  ];
+  };
+
+  // Filter stats cards based on user role
+  const statsCards = dashboardConfig.stats.map(statKey => allStatsCards[statKey as keyof typeof allStatsCards]).filter(Boolean);
 
   if (isLoading) {
     return (
