@@ -149,6 +149,7 @@ export interface IStorage {
   checkAppointmentConflict(appointmentDate: Date, duration: number, doctorId: string, excludeAppointmentId?: string): Promise<boolean>;
   getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<any[]>;
   getWeeklyAppointments(startOfWeek: Date): Promise<any[]>;
+  getMonthlyAppointments(startOfMonth: Date, endOfMonth: Date): Promise<any[]>;
 
   // Settings management
   getSetting(key: string): Promise<Setting | undefined>;
@@ -966,6 +967,32 @@ export class PostgreSQLStorage implements IStorage {
     .where(and(
       gte(appointments.appointmentDate, startOfWeek),
       lte(appointments.appointmentDate, endOfWeek)
+    ))
+    .orderBy(appointments.appointmentDate);
+  }
+
+  async getMonthlyAppointments(startOfMonth: Date, endOfMonth: Date): Promise<any[]> {
+    return await db.select({
+      id: appointments.id,
+      patientId: appointments.patientId,
+      doctorId: appointments.doctorId,
+      serviceId: appointments.serviceId,
+      appointmentDate: appointments.appointmentDate,
+      duration: appointments.duration,
+      status: appointments.status,
+      notes: appointments.notes,
+      createdAt: appointments.createdAt,
+      patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+      serviceName: sql<string>`COALESCE(${services.nameEn}, ${services.nameAr})`,
+      doctorName: users.fullName
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(appointments.patientId, patients.id))
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .leftJoin(users, eq(appointments.doctorId, users.id))
+    .where(and(
+      gte(appointments.appointmentDate, startOfMonth),
+      lte(appointments.appointmentDate, endOfMonth)
     ))
     .orderBy(appointments.appointmentDate);
   }

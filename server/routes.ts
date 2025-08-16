@@ -972,6 +972,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Monthly appointments endpoint
+  app.get("/api/appointments/month", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const dateParam = req.query.startDate as string;
+      const baseDate = dateParam ? new Date(dateParam) : new Date();
+      
+      // Get start and end of month
+      const startOfMonth = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+      const endOfMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+      
+      const appointments = await storage.getMonthlyAppointments(startOfMonth, endOfMonth);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Monthly appointments error:", error);
+      res.status(500).json({ error: "Failed to fetch monthly appointments" });
+    }
+  });
+
+  // Dashboard statistics endpoint
+  app.get("/api/dashboard/appointments-stats", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+      
+      const weekStart = new Date(today);
+      const dayOfWeek = today.getDay();
+      const daysToSaturday = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
+      weekStart.setDate(today.getDate() - daysToSaturday);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      
+      // Get all appointments and calculate stats
+      const allAppointments = await storage.getAllAppointments();
+      
+      const stats = {
+        totalToday: allAppointments.filter(apt => {
+          const aptDate = new Date(apt.appointmentDate);
+          return aptDate >= todayStart && aptDate < todayEnd;
+        }).length,
+        
+        totalWeek: allAppointments.filter(apt => {
+          const aptDate = new Date(apt.appointmentDate);
+          return aptDate >= weekStart;
+        }).length,
+        
+        totalMonth: allAppointments.filter(apt => {
+          const aptDate = new Date(apt.appointmentDate);
+          return aptDate >= monthStart;
+        }).length,
+        
+        confirmed: allAppointments.filter(apt => apt.status === "CONFIRMED").length,
+        completed: allAppointments.filter(apt => apt.status === "COMPLETED").length,
+        cancelled: allAppointments.filter(apt => apt.status === "CANCELLED").length,
+        noShow: allAppointments.filter(apt => apt.status === "NO_SHOW").length,
+        
+        upcoming: allAppointments.filter(apt => {
+          const aptDate = new Date(apt.appointmentDate);
+          return aptDate > today && apt.status === "SCHEDULED";
+        }).length
+      };
+      
+      res.json(stats);
+    } catch (error) {
+      console.error("Dashboard stats error:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard statistics" });
+    }
+  });
+
   // Get available time slots for a specific date and doctor
   app.get("/api/appointments/available-slots", requireAuth, async (req: Request, res: Response) => {
     try {

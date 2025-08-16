@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format, addDays, startOfWeek, endOfWeek, isFriday, parseISO, isToday, isSameWeek } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, isFriday, parseISO, isToday, isSameWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addWeeks, subWeeks, addMonths, subMonths } from "date-fns";
 import { ar } from "date-fns/locale";
 import { 
   Calendar, 
@@ -24,7 +24,18 @@ import {
   Edit,
   Trash2,
   UserPlus,
-  RefreshCw
+  RefreshCw,
+  Grid3X3,
+  List,
+  BarChart3,
+  TrendingUp,
+  Users,
+  Activity,
+  FileText,
+  Download,
+  Bell,
+  Eye,
+  Copy
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +49,11 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -99,10 +115,16 @@ export default function AppointmentsPage() {
   const isArabic = document.documentElement.dir === "rtl";
   
   // State management
-  const [currentView, setCurrentView] = useState<"week" | "day" | "today">("week");
+  const [currentView, setCurrentView] = useState<"day" | "week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 6 }));
+  const [currentMonthStart, setCurrentMonthStart] = useState(startOfMonth(new Date()));
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithDetails | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDoctor, setSelectedDoctor] = useState<string>("all");
+  const [selectedService, setSelectedService] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<{start: Date, end: Date} | null>(null);
+  const [showStats, setShowStats] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [civilIdInput, setCivilIdInput] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -198,6 +220,31 @@ export default function AppointmentsPage() {
   const patients = Array.isArray(patientsData) ? patientsData : [];
   const services = Array.isArray(servicesData) ? servicesData : [];
   const doctors = Array.isArray(doctorsData) ? doctorsData : [];
+
+  // Dashboard statistics query
+  const { data: dashboardStats } = useQuery({
+    queryKey: ["/api/dashboard/appointments-stats"],
+    queryFn: async () => {
+      const response = await apiRequest("/api/dashboard/appointments-stats");
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard stats');
+      }
+      return await response.json();
+    },
+  });
+
+  // Monthly appointments query for calendar view
+  const { data: monthlyAppointments = [] } = useQuery({
+    queryKey: ["/api/appointments/month", format(currentMonthStart, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const response = await apiRequest(`/api/appointments/month?startDate=${format(currentMonthStart, "yyyy-MM-dd")}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch monthly appointments');
+      }
+      return await response.json();
+    },
+    enabled: currentView === "month"
+  });
 
   const { data: availableSlots = [] } = useQuery({
     queryKey: ["/api/appointments/available-slots", format(selectedDate, "yyyy-MM-dd")],
@@ -410,8 +457,27 @@ export default function AppointmentsPage() {
     }
 
     const filteredAppointments = Array.isArray(appointments) ? appointments.filter((apt: AppointmentWithDetails) => {
-      if (statusFilter === "ALL") return true;
-      return apt.status === statusFilter;
+      // Status filter
+      if (statusFilter !== "ALL" && apt.status !== statusFilter) return false;
+      
+      // Doctor filter
+      if (selectedDoctor !== "all" && apt.doctorId !== selectedDoctor) return false;
+      
+      // Service filter
+      if (selectedService !== "all" && apt.serviceId !== selectedService) return false;
+      
+      // Search filter
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        const matchesPatient = apt.patientName?.toLowerCase().includes(searchLower);
+        const matchesService = apt.serviceName?.toLowerCase().includes(searchLower);
+        const matchesDoctor = apt.doctorName?.toLowerCase().includes(searchLower);
+        const matchesNotes = apt.notes?.toLowerCase().includes(searchLower);
+        
+        if (!matchesPatient && !matchesService && !matchesDoctor && !matchesNotes) return false;
+      }
+      
+      return true;
     }) : [];
 
     const getDayAppointments = (date: Date) => {
@@ -488,11 +554,227 @@ export default function AppointmentsPage() {
   };
 
   // Today view for printing
+  // Enhanced Dashboard Statistics Component
+  const DashboardStats = () => {
+    const stats = dashboardStats || {
+      totalToday: 0,
+      totalWeek: 0,
+      totalMonth: 0,
+      confirmed: 0,
+      completed: 0,
+      cancelled: 0,
+      noShow: 0,
+      upcoming: 0
+    };
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {isArabic ? "مواعيد اليوم" : "Today's Appointments"}
+            </CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalToday}</div>
+            <p className="text-xs text-muted-foreground">
+              {isArabic ? "موعد مجدول لليوم" : "appointments scheduled"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {isArabic ? "هذا الأسبوع" : "This Week"}
+            </CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalWeek}</div>
+            <p className="text-xs text-muted-foreground">
+              {isArabic ? "موعد هذا الأسبوع" : "appointments this week"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {isArabic ? "مكتملة" : "Completed"}
+            </CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+            <p className="text-xs text-muted-foreground">
+              {isArabic ? "موعد مكتمل" : "completed appointments"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {isArabic ? "قادمة" : "Upcoming"}
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.upcoming}</div>
+            <p className="text-xs text-muted-foreground">
+              {isArabic ? "موعد قادم" : "upcoming appointments"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  // Enhanced Monthly Calendar Component
+  const MonthCalendar = () => {
+    const monthStart = startOfMonth(currentMonthStart);
+    const monthEnd = endOfMonth(monthStart);
+    const calendarDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
+    const filteredAppointments = Array.isArray(monthlyAppointments) ? monthlyAppointments.filter((apt: AppointmentWithDetails) => {
+      if (statusFilter === "ALL") return true;
+      return apt.status === statusFilter;
+    }) : [];
+
+    const getDayAppointments = (date: Date) => {
+      return filteredAppointments.filter((apt: AppointmentWithDetails) => 
+        format(parseISO(apt.appointmentDate.toString()), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+      );
+    };
+
+    return (
+      <div className="space-y-4">
+        {/* Month Navigation */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">
+            {format(currentMonthStart, "MMMM yyyy", { locale: isArabic ? ar : undefined })}
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentMonthStart(subMonths(currentMonthStart, 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentMonthStart(new Date())}
+            >
+              {isArabic ? "اليوم" : "Today"}
+            </Button>
+            <Button
+              variant="outline" 
+              size="sm"
+              onClick={() => setCurrentMonthStart(addMonths(currentMonthStart, 1))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-2">
+          {/* Day Headers */}
+          {['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((day) => (
+            <div key={day} className="p-2 text-center text-sm font-medium text-muted-foreground">
+              {isArabic ? 
+                ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'][['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'].indexOf(day)]
+                : day
+              }
+            </div>
+          ))}
+          
+          {/* Calendar Days */}
+          {calendarDays.map((day) => {
+            const dayAppointments = getDayAppointments(day);
+            const isDisabled = isFriday(day);
+            
+            return (
+              <Card key={day.toString()} className={cn(
+                "min-h-[100px] cursor-pointer hover:shadow-md transition-shadow",
+                isDisabled && "bg-gray-50 dark:bg-gray-900 opacity-50",
+                isToday(day) && "ring-2 ring-blue-500",
+                !isSameMonth(day, currentMonthStart) && "opacity-30"
+              )}
+              onClick={() => {
+                setSelectedDate(day);
+                setCurrentView("day");
+              }}>
+                <CardHeader className="p-2">
+                  <div className={cn(
+                    "text-sm font-medium",
+                    isToday(day) && "text-blue-600 dark:text-blue-400"
+                  )}>
+                    {format(day, "d")}
+                  </div>
+                </CardHeader>
+                <CardContent className="p-2 pt-0">
+                  <div className="space-y-1">
+                    {dayAppointments.slice(0, 2).map((apt: AppointmentWithDetails) => (
+                      <div
+                        key={apt.id}
+                        className={cn(
+                          "text-xs p-1 rounded truncate",
+                          apt.status === "SCHEDULED" && "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
+                          apt.status === "CONFIRMED" && "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200",
+                          apt.status === "COMPLETED" && "bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200"
+                        )}
+                      >
+                        {format(parseISO(apt.appointmentDate.toString()), "HH:mm")} {apt.patientName}
+                      </div>
+                    ))}
+                    {dayAppointments.length > 2 && (
+                      <div className="text-xs text-muted-foreground">
+                        +{dayAppointments.length - 2} {isArabic ? "موعد أخرى" : "more"}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const TodayView = () => {
-    const todayFormatted = format(new Date(), "yyyy-MM-dd");
-    const todayAppointmentsList = Array.isArray(appointments) ? appointments.filter((apt: AppointmentWithDetails) =>
-      format(parseISO(apt.appointmentDate.toString()), 'yyyy-MM-dd') === todayFormatted
-    ).sort((a, b) => new Date(a.appointmentDate.toString()).getTime() - new Date(b.appointmentDate.toString()).getTime()) : [];
+    const todayFormatted = format(selectedDate, "yyyy-MM-dd");
+    const todayAppointmentsList = Array.isArray(appointments) ? appointments.filter((apt: AppointmentWithDetails) => {
+      // Date filter
+      if (format(parseISO(apt.appointmentDate.toString()), 'yyyy-MM-dd') !== todayFormatted) return false;
+      
+      // Status filter
+      if (statusFilter !== "ALL" && apt.status !== statusFilter) return false;
+      
+      // Doctor filter
+      if (selectedDoctor !== "all" && apt.doctorId !== selectedDoctor) return false;
+      
+      // Service filter
+      if (selectedService !== "all" && apt.serviceId !== selectedService) return false;
+      
+      // Search filter
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        const matchesPatient = apt.patientName?.toLowerCase().includes(searchLower);
+        const matchesService = apt.serviceName?.toLowerCase().includes(searchLower);
+        const matchesDoctor = apt.doctorName?.toLowerCase().includes(searchLower);
+        const matchesNotes = apt.notes?.toLowerCase().includes(searchLower);
+        
+        if (!matchesPatient && !matchesService && !matchesDoctor && !matchesNotes) return false;
+      }
+      
+      return true;
+    }).sort((a, b) => new Date(a.appointmentDate.toString()).getTime() - new Date(b.appointmentDate.toString()).getTime()) : [];
 
     return (
       <div className="printable-today bg-white dark:bg-gray-900 p-8">
@@ -554,19 +836,40 @@ export default function AppointmentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Enhanced Header with Dashboard Toggle */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">
-          {isArabic ? "المواعيد" : "Appointments"}
-        </h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold">
+            {isArabic ? "المواعيد" : "Appointments"}
+          </h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowStats(!showStats)}
+            className="gap-2"
+          >
+            <BarChart3 className="h-4 w-4" />
+            {showStats ? (isArabic ? "إخفاء الإحصائيات" : "Hide Stats") : (isArabic ? "عرض الإحصائيات" : "Show Stats")}
+          </Button>
+        </div>
         <div className="flex items-center gap-2">
-          <Select value={currentView} onValueChange={(value: "week" | "day" | "today") => setCurrentView(value)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
+          >
+            <Filter className="h-4 w-4" />
+            {isArabic ? "فلاتر" : "Filters"}
+          </Button>
+          <Select value={currentView} onValueChange={(value: "day" | "week" | "month") => setCurrentView(value)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="day">{isArabic ? "مواعيد اليوم" : "Day View"}</SelectItem>
               <SelectItem value="week">{isArabic ? "عرض أسبوعي" : "Week View"}</SelectItem>
-              <SelectItem value="today">{isArabic ? "مواعيد اليوم" : "Today"}</SelectItem>
+              <SelectItem value="month">{isArabic ? "عرض شهري" : "Month View"}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -921,9 +1224,92 @@ export default function AppointmentsPage() {
         </div>
       )}
 
+      {/* Dashboard Statistics */}
+      {showStats && <DashboardStats />}
+
+      {/* Enhanced Filters */}
+      {showFilters && (
+        <Card className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                {isArabic ? "البحث" : "Search"}
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={isArabic ? "البحث في المواعيد..." : "Search appointments..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                {isArabic ? "الطبيب" : "Doctor"}
+              </Label>
+              <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
+                <SelectTrigger>
+                  <SelectValue placeholder={isArabic ? "اختر طبيب" : "Select Doctor"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{isArabic ? "جميع الأطباء" : "All Doctors"}</SelectItem>
+                  {doctors.map((doctor: UserType) => (
+                    <SelectItem key={doctor.id} value={doctor.id}>
+                      {doctor.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                {isArabic ? "الخدمة" : "Service"}
+              </Label>
+              <Select value={selectedService} onValueChange={setSelectedService}>
+                <SelectTrigger>
+                  <SelectValue placeholder={isArabic ? "اختر خدمة" : "Select Service"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{isArabic ? "جميع الخدمات" : "All Services"}</SelectItem>
+                  {services.map((service: Service) => (
+                    <SelectItem key={service.id} value={service.id}>
+                      {service.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                {isArabic ? "الحالة" : "Status"}
+              </Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">{isArabic ? "جميع الحالات" : "All Status"}</SelectItem>
+                  <SelectItem value="SCHEDULED">{isArabic ? "مجدول" : "Scheduled"}</SelectItem>
+                  <SelectItem value="CONFIRMED">{isArabic ? "مؤكد" : "Confirmed"}</SelectItem>
+                  <SelectItem value="COMPLETED">{isArabic ? "مكتمل" : "Completed"}</SelectItem>
+                  <SelectItem value="CANCELLED">{isArabic ? "ملغي" : "Cancelled"}</SelectItem>
+                  <SelectItem value="NO_SHOW">{isArabic ? "لم يحضر" : "No Show"}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Main Content */}
+      {currentView === "day" && <TodayView />}
       {currentView === "week" && <WeekCalendar />}
-      {currentView === "today" && <TodayView />}
+      {currentView === "month" && <MonthCalendar />}
 
       {/* Appointment Details Dialog */}
       <Dialog open={!!selectedAppointment} onOpenChange={() => setSelectedAppointment(null)}>
