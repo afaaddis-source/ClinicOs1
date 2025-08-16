@@ -40,7 +40,7 @@ import {
   type InsertClinicInfo,
 } from "@shared/schema";
 
-import { db } from "../src/lib/db";
+import { db } from "./db";
 
 export interface IStorage {
   // User management
