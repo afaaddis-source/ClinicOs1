@@ -16,11 +16,12 @@ Preferred communication style: Simple, everyday language.
   - **ORM Migration**: Migrated from Prisma to Drizzle ORM for better PostgreSQL compatibility
   - **Storage Layer**: Updated all storage methods to use Drizzle PostgreSQL storage
   - **Database Schema**: Applied all schema migrations successfully using `npm run db:push`
-  - **User Seeding**: Created default users for all roles with credentials:
-    - admin/admin123 (ADMIN)
-    - reception/reception123 (RECEPTION) 
-    - doctor/doctor123 (DOCTOR)
-    - accountant/accountant123 (ACCOUNTANT)
+  - **User Seeding**: Created default users for all roles with credentials matching login page:
+    - admin/123456 (ADMIN)
+    - reception/123456 (RECEPTION) 
+    - doctor/123456 (DOCTOR)
+    - accountant/123456 (ACCOUNTANT)
+  - **Authentication Fix**: Fixed password hashing compatibility and verified login works
   - **API Testing**: Verified login functionality works correctly via curl testing
   - **TypeScript**: Fixed all compilation errors and LSP diagnostics
   - **Status**: ✅ COMPLETED - Application running successfully on port 5000 with working authentication
