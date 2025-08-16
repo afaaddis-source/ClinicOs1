@@ -14,7 +14,10 @@ import {
   AlertTriangle,
   Search,
   Play,
-  Plus
+  Plus,
+  LayoutDashboard,
+  Stethoscope,
+  CreditCard
 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useUser } from "@/hooks/use-auth";
